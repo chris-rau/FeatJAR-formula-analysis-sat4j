@@ -27,9 +27,11 @@ import de.featjar.base.computation.Dependency;
 import de.featjar.base.computation.IComputation;
 import de.featjar.base.computation.Progress;
 import de.featjar.base.data.Result;
+import de.featjar.formula.VariableMap;
 import de.featjar.formula.assignment.BooleanAssignment;
 import de.featjar.formula.assignment.BooleanAssignmentList;
 import de.featjar.formula.assignment.BooleanSolution;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
@@ -55,45 +57,57 @@ public class ComputeCoreSAT4J extends ASAT4JAnalysis.Solution<BooleanAssignment>
         SAT4JSolutionSolver solver = initializeSolver(dependencyList);
         Random random = new Random(RANDOM_SEED.get(dependencyList));
         BooleanAssignment variablesOfInterest = VARIABLES_OF_INTEREST.get(dependencyList);
-        final int initialAssignmentLength = solver.getAssignment().size();
-        solver.setSelectionStrategy(ISelectionStrategy.positive()); // TODO: fails for berkeley db
-        Result<BooleanSolution> solution = solver.findSolution();
-        if (solution.isEmpty()) return Result.empty();
-        int[] model1 = solution.get().get();
+        VariableMap variableMap = BOOLEAN_CLAUSE_LIST.get(dependencyList).getVariableMap();
+        int variableCount = variableMap.getVariableCount();
 
-        if (model1 != null) {
-            solver.setSelectionStrategy(ISelectionStrategy.inverse(model1));
+        checkCancel();
+        progress.setTotalSteps(variableCount + 2);
 
-            if (!variablesOfInterest.isEmpty()) {
-                final int[] model3 = new int[model1.length];
-                for (int i = 0; i < variablesOfInterest.get().length; i++) {
-                    final int index = variablesOfInterest.get()[i] - 1;
-                    if (index >= 0) {
-                        model3[index] = model1[index];
-                    }
-                }
-                model1 = model3;
+        solver.setSelectionStrategy(ISelectionStrategy.positive());
+        Result<Boolean> hasSolution = solver.hasSolution();
+        if (hasSolution.isEmpty()) {
+            return hasSolution.merge(Result.empty());
+        } else if (hasSolution.valueEquals(Boolean.FALSE)) {
+            return Result.of(new BooleanAssignment());
+        }
+        int[] potentialCore = Arrays.copyOf(solver.getInternalSolution(), variableCount);
+
+        progress.incrementCurrentStep();
+        checkCancel();
+
+        solver.setSelectionStrategy(ISelectionStrategy.inverse(potentialCore));
+        hasSolution = solver.hasSolution();
+        if (hasSolution.isEmpty()) {
+            return hasSolution.merge(Result.empty());
+        }
+        BooleanSolution.removeConflictsInplace(potentialCore, solver.getInternalSolution());
+        solver.shuffleOrder(random);
+        solver.setSelectionStrategy(ISelectionStrategy.random(random));
+
+        progress.incrementCurrentStep();
+        checkCancel();
+
+        if (!variablesOfInterest.isEmpty()) {
+            for (int l : variablesOfInterest.get()) {
+                potentialCore[l - 1] = 0;
             }
+        }
 
-            for (int i = 0; i < initialAssignmentLength; i++) {
-                model1[Math.abs(solver.getAssignment().peek(i)) - 1] = 0;
-            }
-
-            for (int i = 0; i < model1.length; i++) {
-                final int varX = model1[i];
-                if (varX != 0) {
-                    checkCancel();
-                    solver.getAssignment().add(-varX);
-                    Result<Boolean> hasSolution = solver.hasSolution();
-                    if (hasSolution.valueEquals(false)) {
-                        solver.getAssignment().replaceLast(varX);
-                    } else if (hasSolution.isEmpty()) {
-                        solver.getAssignment().remove();
-                    } else if (hasSolution.valueEquals(true)) {
-                        solver.getAssignment().remove();
-                        BooleanSolution.removeConflictsInplace(model1, solver.getInternalSolution());
-                        solver.shuffleOrder(random);
-                    }
+        for (int i = 0; i < variableCount; i++) {
+            progress.incrementCurrentStep();
+            checkCancel();
+            final int l = potentialCore[i];
+            if (l != 0) {
+                solver.getAssignment().add(-l);
+                hasSolution = solver.hasSolution();
+                if (hasSolution.valueEquals(false)) {
+                    solver.getAssignment().replaceLast(l);
+                } else if (hasSolution.isEmpty()) {
+                    solver.getAssignment().remove();
+                } else if (hasSolution.valueEquals(true)) {
+                    solver.getAssignment().remove();
+                    BooleanSolution.removeConflictsInplace(potentialCore, solver.getInternalSolution());
+                    solver.shuffleOrder(random);
                 }
             }
         }
