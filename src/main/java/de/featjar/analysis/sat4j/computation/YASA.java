@@ -85,7 +85,7 @@ public class YASA extends ATWiseSampleComputation {
     public static final Dependency<Boolean> INCREMENTAL_T = Dependency.newDependency(Boolean.class);
 
     public YASA(IComputation<BooleanAssignmentList> clauseList) {
-        super(clauseList, Computations.of(2), Computations.of(65_536), Computations.of(Boolean.TRUE));
+        super(clauseList, Computations.of(1), Computations.of(65_536), Computations.of(Boolean.TRUE));
     }
 
     private int minT, iterations, randomConfigurationLimit, curSolutionId, randomSampleIdsIndex;
@@ -95,9 +95,7 @@ public class YASA extends ATWiseSampleComputation {
     @Override
     public Result<BooleanAssignmentList> computeSample(List<Object> dependencyList, Progress progress) {
         iterations = ITERATIONS.get(dependencyList);
-        if (iterations == 0) {
-            throw new IllegalArgumentException("Iterations must not equal 0.");
-        } else if (iterations < 0) {
+        if (iterations < 0) {
             iterations = Integer.MAX_VALUE;
         }
 
@@ -126,7 +124,7 @@ public class YASA extends ATWiseSampleComputation {
 
         int count = variables.getTotalSteps();
         for (int t = minT; t <= maxT; t++) {
-            count += (iterations - 1) * (1 << t) * variables.forOtherT(t).getTotalSteps();
+            count += iterations * (1 << t) * variables.forOtherT(t).getTotalSteps();
         }
         progress.setTotalSteps(count);
 
