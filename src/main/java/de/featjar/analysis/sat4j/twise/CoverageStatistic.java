@@ -26,9 +26,14 @@ package de.featjar.analysis.sat4j.twise;
  * @author Sebastian Krieter
  */
 public class CoverageStatistic {
-    long numberOfInvalidConditions;
-    long numberOfCoveredConditions;
-    long numberOfUncoveredConditions;
+    private final int t;
+    private long numberOfInvalidConditions;
+    private long numberOfCoveredConditions;
+    private long numberOfUncoveredConditions;
+
+    public CoverageStatistic(int t) {
+        this.t = t;
+    }
 
     public void setNumberOfInvalidConditions(long numberOfInvalidConditions) {
         this.numberOfInvalidConditions = numberOfInvalidConditions;
@@ -85,5 +90,35 @@ public class CoverageStatistic {
         numberOfCoveredConditions += other.numberOfCoveredConditions;
         numberOfUncoveredConditions += other.numberOfUncoveredConditions;
         return this;
+    }
+
+    public String print() {
+        long total = total();
+        int digits = total == 0 ? 1 : (int) (Math.log10(total()) + 1);
+        String format = "%" + digits + "d";
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(t);
+        sb.append("-Wise Interaction Coverage Statistics");
+        sb.append("\nCoverage:     ");
+        sb.append(coverage());
+        sb.append("\nInteractions: ");
+        sb.append(total);
+        sb.append("\n ");
+        sb.append(Character.toChars(0x251c));
+        sb.append(Character.toChars(0x2500));
+        sb.append("Covered:   ");
+        sb.append(String.format(format, numberOfCoveredConditions));
+        sb.append("\n ");
+        sb.append(Character.toChars(0x251c));
+        sb.append(Character.toChars(0x2500));
+        sb.append("Uncovered: ");
+        sb.append(String.format(format, numberOfUncoveredConditions));
+        sb.append("\n ");
+        sb.append(Character.toChars(0x2514));
+        sb.append(Character.toChars(0x2500));
+        sb.append("Invalid:   ");
+        sb.append(String.format(format, numberOfInvalidConditions));
+        return sb.toString();
     }
 }

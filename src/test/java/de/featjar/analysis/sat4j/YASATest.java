@@ -34,8 +34,8 @@ import de.featjar.analysis.sat4j.solver.ISelectionStrategy;
 import de.featjar.analysis.sat4j.twise.CoverageStatistic;
 import de.featjar.analysis.sat4j.twise.RelativeTWiseCoverageComputation;
 import de.featjar.analysis.sat4j.twise.TWiseCoverageComputation;
-import de.featjar.analysis.sat4j.twise.TWiseStatisticGenerator;
 import de.featjar.base.FeatJAR;
+import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.IComputation;
 import de.featjar.formula.assignment.BooleanAssignment;
 import de.featjar.formula.assignment.BooleanAssignmentList;
@@ -95,16 +95,6 @@ public class YASATest extends Common {
     }
 
     @Test
-    public void testBothCoverageRandom() {
-        bothRandom(loadFormula("models_stability_light/busybox_monthlySnapshot/2007-05-20_17-12-43/clean.dimacs"));
-    }
-
-    @Test
-    public void benchmark() {
-        benchmarkCompareSample("models_stability_light/busybox_monthlySnapshot/2007-05-20_17-12-43/clean.dimacs", 2);
-    }
-
-    @Test
     public void variants() {
         compareVariants(loadFormula("models_stability_light/busybox_monthlySnapshot/2007-05-20_17-12-43/clean.dimacs"));
     }
@@ -129,29 +119,6 @@ public class YASATest extends Common {
         FeatJAR.log().info((System.currentTimeMillis() - time) / 1000.0);
     }
 
-    private void benchmarkCompareSample(String modelPath, int t) {
-        IFormula formula = loadFormula(modelPath);
-        IComputation<BooleanAssignmentList> clauses = getClauses(formula);
-
-        FeatJAR.log().info("Comparing random sample (10) for %s with t = %d", modelPath, t);
-        benchmarkCompare(clauses, computeRandomSample(clauses, 10), t);
-        FeatJAR.log().info("Comparing random sample (100) for %s with t = %d", modelPath, t);
-        benchmarkCompare(clauses, computeRandomSample(clauses, 100), t);
-        FeatJAR.log().info("Comparing  %d-wise for %s with t = %d", t, modelPath, t);
-        benchmarkCompare(clauses, computeSample(t, clauses), t);
-    }
-
-    private void benchmarkCompare(IComputation<BooleanAssignmentList> clauses, BooleanAssignmentList sample, int t) {
-        long time;
-        time = System.currentTimeMillis();
-        computeCoverageNew(t, clauses, sample);
-        FeatJAR.log().info((System.currentTimeMillis() - time) / 1000.0);
-
-        time = System.currentTimeMillis();
-        computeCoverageOld(t, clauses, sample);
-        FeatJAR.log().info((System.currentTimeMillis() - time) / 1000.0);
-    }
-
     void onlyNew(IFormula formula) {
         IComputation<BooleanAssignmentList> clauses = getClauses(formula);
         BooleanAssignmentList sample = computeSample(2, clauses);
@@ -162,22 +129,6 @@ public class YASATest extends Common {
         IComputation<BooleanAssignmentList> clauses = getClauses(formula);
         BooleanAssignmentList sample = computeRandomSample(clauses, 10);
         computeCoverageVariants(2, clauses, sample);
-    }
-
-    private void bothRandom(IFormula formula) {
-        IComputation<BooleanAssignmentList> clauses = getClauses(formula);
-        BooleanAssignmentList sample = computeRandomSample(clauses, 10);
-        CoverageStatistic statistic1 = computeCoverageNew(2, clauses, sample);
-        CoverageStatistic statistic3 = computeCoverageOld(2, clauses, sample);
-
-        FeatJAR.log().info("total     %d | %d", statistic1.total(), statistic3.total());
-        FeatJAR.log().info("covered   %d | %d", statistic1.covered(), statistic3.covered());
-        FeatJAR.log().info("uncovered %d | %d", statistic1.uncovered(), statistic3.uncovered());
-        FeatJAR.log().info("invalid   %d | %d", statistic1.invalid(), statistic3.invalid());
-        assertEquals(statistic1.total(), statistic3.total());
-        assertEquals(statistic1.covered(), statistic3.covered());
-        assertEquals(statistic1.uncovered(), statistic3.uncovered());
-        assertEquals(statistic1.invalid(), statistic3.invalid());
     }
 
     void onlyNewRandom(IFormula formula) {
@@ -201,26 +152,20 @@ public class YASATest extends Common {
 
         CoverageStatistic statistic1 = computeCoverageNew(t, clauses, sample);
         CoverageStatistic statistic2 = computeCoverageRel(t, clauses, sample);
-        CoverageStatistic statistic3 = computeCoverageOld(t, clauses, sample);
         CoverageStatistic statistic4 = computeCoverageRel2(t, clauses, sample);
 
-        FeatJAR.log().info("total     %d | %d | %d", statistic1.total(), statistic2.total(), statistic3.total());
-        FeatJAR.log().info("covered   %d | %d | %d", statistic1.covered(), statistic2.covered(), statistic3.covered());
-        FeatJAR.log()
-                .info("uncovered %d | %d | %d", statistic1.uncovered(), statistic2.uncovered(), statistic3.uncovered());
-        FeatJAR.log().info("invalid   %d | %d | %d", statistic1.invalid(), statistic2.invalid(), statistic3.invalid());
+        FeatJAR.log().info("total     %d | %d", statistic1.total(), statistic2.total());
+        FeatJAR.log().info("covered   %d | %d", statistic1.covered(), statistic2.covered());
+        FeatJAR.log().info("uncovered %d | %d", statistic1.uncovered(), statistic2.uncovered());
+        FeatJAR.log().info("invalid   %d | %d", statistic1.invalid(), statistic2.invalid());
 
         assertEquals(1.0, statistic1.coverage());
         assertEquals(1.0, statistic2.coverage());
-        assertEquals(1.0, statistic3.coverage());
         assertEquals(1.0, statistic4.coverage());
 
         assertEquals(statistic1.covered(), statistic2.covered());
         assertEquals(statistic1.uncovered(), statistic2.uncovered());
         assertEquals(statistic1.invalid(), statistic2.invalid());
-        assertEquals(statistic1.covered(), statistic3.covered());
-        assertEquals(statistic1.uncovered(), statistic3.uncovered());
-        assertEquals(statistic1.invalid(), statistic3.invalid());
         assertEquals(statistic1.covered(), statistic4.covered());
         assertEquals(statistic1.uncovered(), statistic4.uncovered());
         assertEquals(statistic1.invalid(), statistic4.invalid());
@@ -234,22 +179,11 @@ public class YASATest extends Common {
         return sample;
     }
 
-    private CoverageStatistic computeCoverageOld(
-            int t, IComputation<BooleanAssignmentList> clauses, BooleanAssignmentList sample) {
-        CoverageStatistic statistic = clauses.map(TWiseStatisticGenerator::new)
-                .set(TWiseStatisticGenerator.SAMPLE, sample)
-                .set(TWiseStatisticGenerator.CORE, new BooleanAssignment())
-                .set(TWiseStatisticGenerator.T, t)
-                .compute();
-        FeatJAR.log().info("Computed Coverage (TWiseStatisticGenerator)");
-        return statistic;
-    }
-
     private CoverageStatistic computeCoverageRel(
             int t, IComputation<BooleanAssignmentList> clauses, BooleanAssignmentList sample) {
-        CoverageStatistic statistic = clauses.map(ComputeSolutionsSAT4J::new)
+        CoverageStatistic statistic = Computations.of(sample)
                 .map(RelativeTWiseCoverageComputation::new)
-                .set(RelativeTWiseCoverageComputation.SAMPLE, sample)
+                .set(RelativeTWiseCoverageComputation.REFERENCE_SAMPLE, clauses.map(ComputeSolutionsSAT4J::new))
                 .set(RelativeTWiseCoverageComputation.T, t)
                 .compute();
         FeatJAR.log().info("Computed Coverage (RelativeTWiseCoverageComputation)");
@@ -258,9 +192,9 @@ public class YASATest extends Common {
 
     private CoverageStatistic computeCoverageRel2(
             int t, IComputation<BooleanAssignmentList> clauses, BooleanAssignmentList sample) {
-        CoverageStatistic statistic = clauses.map(ComputeSolutionsSAT4J::new)
+        CoverageStatistic statistic = Computations.of(sample)
                 .map(RelativeTWiseCoverageComputation::new)
-                .set(RelativeTWiseCoverageComputation.SAMPLE, sample)
+                .set(RelativeTWiseCoverageComputation.REFERENCE_SAMPLE, clauses.map(ComputeSolutionsSAT4J::new))
                 .set(RelativeTWiseCoverageComputation.T, t)
                 .compute();
         FeatJAR.log().info("Computed Coverage (RelativeTWiseCoverageComputation2)");

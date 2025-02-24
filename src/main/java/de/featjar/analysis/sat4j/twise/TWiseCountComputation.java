@@ -38,7 +38,10 @@ import java.util.List;
  * solutions.
  *
  * @author Sebastian Krieter
+ *
+ * @deprecated use {@link AbsoluteTWiseCoverageComputation}
  */
+@Deprecated
 public class TWiseCountComputation extends AComputation<Long> {
 
     public static class CombinationList {

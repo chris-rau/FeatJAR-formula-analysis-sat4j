@@ -9,5 +9,6 @@
 		<extension id="de.featjar.analysis.sat4j.cli.YASACommand" />
 		<extension id="de.featjar.analysis.sat4j.cli.LegacyYASACommand" />
 		<extension id="de.featjar.analysis.sat4j.cli.ProjectionCommand" />
+		<extension id="de.featjar.analysis.sat4j.cli.TWiseCoverageCommand" />
 	</point>
 </extensions>

@@ -20,17 +20,11 @@
  */
 package de.featjar.analysis.sat4j.twise;
 
-import de.featjar.base.computation.AComputation;
 import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.Dependency;
 import de.featjar.base.computation.IComputation;
-import de.featjar.base.computation.Progress;
-import de.featjar.base.data.Ints;
-import de.featjar.base.data.LexicographicIterator;
-import de.featjar.base.data.Result;
-import de.featjar.formula.assignment.BooleanAssignment;
+import de.featjar.base.data.Combination;
 import de.featjar.formula.assignment.BooleanAssignmentList;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -40,83 +34,45 @@ import java.util.Objects;
  *
  * @author Sebastian Krieter
  */
-public class RelativeTWiseCoverageComputation extends AComputation<CoverageStatistic> {
+public class RelativeTWiseCoverageComputation extends ATWiseCoverageComputation {
     public static final Dependency<BooleanAssignmentList> REFERENCE_SAMPLE =
             Dependency.newDependency(BooleanAssignmentList.class);
-    public static final Dependency<Integer> T = Dependency.newDependency(Integer.class);
-    public static final Dependency<BooleanAssignmentList> SAMPLE =
-            Dependency.newDependency(BooleanAssignmentList.class);
-    public static final Dependency<BooleanAssignment> FILTER = Dependency.newDependency(BooleanAssignment.class);
 
-    public class Environment {
-        private final CoverageStatistic statistic = new CoverageStatistic();
-
-        public CoverageStatistic getStatistic() {
-            return statistic;
-        }
-    }
-
-    public RelativeTWiseCoverageComputation(IComputation<BooleanAssignmentList> reference) {
-        super(
-                reference,
-                Computations.of(2), //
-                Computations.of(new BooleanAssignmentList(null, 0)), //
-                Computations.of(new BooleanAssignment()));
+    public RelativeTWiseCoverageComputation(IComputation<BooleanAssignmentList> sample) {
+        super(sample, Computations.of(new BooleanAssignmentList(null, 0)));
     }
 
     public RelativeTWiseCoverageComputation(RelativeTWiseCoverageComputation other) {
         super(other);
     }
 
-    private ArrayList<Environment> statisticList = new ArrayList<>();
-    private BooleanAssignmentList sample;
-    private int t, size;
+    private SampleBitIndex referenceIndex;
 
     @Override
-    public Result<CoverageStatistic> compute(List<Object> dependencyList, Progress progress) {
-        sample = SAMPLE.get(dependencyList).toSolutionList();
-        if (!sample.isEmpty()) {
-            BooleanAssignmentList referenceSample =
-                    REFERENCE_SAMPLE.get(dependencyList).toSolutionList();
-            assert Objects.equals(referenceSample.getVariableMap(), sample.getVariableMap());
-
-            t = T.get(dependencyList);
-            size = referenceSample.getVariableMap().getVariableCount();
-
-            SampleBitIndex referenceIndex = new SampleBitIndex(referenceSample.getAll(), size);
-            SampleBitIndex sampleIndex = new SampleBitIndex(sample.getAll(), size);
-
-            final int[] literals = Ints.filteredList(size, FILTER.get(dependencyList));
-            final int[] gray = Ints.grayCode(t);
-
-            LexicographicIterator.parallelStream(t, literals.length, this::createStatistic)
-                    .forEach(combo -> {
-                        int[] select = combo.getSelection(literals);
-                        for (int i = 0; i < gray.length; i++) {
-                            if (referenceIndex.test(select)) {
-                                if (sampleIndex.test(select)) {
-                                    combo.environment.statistic.incNumberOfCoveredConditions();
-                                } else {
-                                    combo.environment.statistic.incNumberOfUncoveredConditions();
-                                }
-                            } else {
-                                combo.environment.statistic.incNumberOfInvalidConditions();
-                            }
-                            int g = gray[i];
-                            select[g] = -select[g];
-                        }
-                    });
+    protected void init(List<Object> dependencyList) {
+        super.init(dependencyList);
+        BooleanAssignmentList referenceSample =
+                REFERENCE_SAMPLE.get(dependencyList).toSolutionList();
+        if (!Objects.equals(referenceSample.getVariableMap(), sample.getVariableMap())) {
+            throw new IllegalArgumentException("Variable map of reference sample is different from given sample.");
         }
-        return Result.ofOptional(statisticList.stream() //
-                .map(Environment::getStatistic) //
-                .reduce((s1, s2) -> s1.merge(s2)));
+        referenceIndex = new SampleBitIndex(referenceSample.getAll(), size);
     }
 
-    private Environment createStatistic() {
-        Environment env = new Environment();
-        synchronized (statisticList) {
-            statisticList.add(env);
+    @Override
+    protected void count(Combination<Environment> combo) {
+        int[] select = combo.getSelection(literals);
+        for (int g : gray) {
+            if (referenceIndex.test(select)) {
+                if (sampleIndex.test(select)) {
+                    combo.environment.statistic.incNumberOfCoveredConditions();
+                } else {
+                    combo.environment.statistic.incNumberOfUncoveredConditions();
+                }
+            } else {
+                combo.environment.statistic.incNumberOfInvalidConditions();
+            }
+            select[g] = -select[g];
         }
-        return env;
     }
 }

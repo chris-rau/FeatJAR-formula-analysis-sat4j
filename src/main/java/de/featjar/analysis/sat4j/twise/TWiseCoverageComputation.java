@@ -57,7 +57,7 @@ public class TWiseCoverageComputation extends ASAT4JAnalysis<CoverageStatistic> 
     public static final Dependency<BooleanAssignment> FILTER = Dependency.newDependency(BooleanAssignment.class);
 
     public class Environment {
-        private final CoverageStatistic statistic = new CoverageStatistic();
+        private final CoverageStatistic statistic = new CoverageStatistic(t);
         private final SAT4JSolutionSolver solver = initializeSolver(dependencyList);
         private final IMIGVisitor visitor = new MIGVisitorByte(MIG.get(dependencyList));
         private SampleListIndex sampleIndex = new SampleListIndex(sample, size, t);
