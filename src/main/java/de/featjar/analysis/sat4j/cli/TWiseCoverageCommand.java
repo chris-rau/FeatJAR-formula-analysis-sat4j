@@ -21,13 +21,12 @@
 package de.featjar.analysis.sat4j.cli;
 
 import de.featjar.analysis.AAnalysisCommand;
-import de.featjar.analysis.sat4j.computation.YASA;
 import de.featjar.analysis.sat4j.twise.AbsoluteTWiseCoverageComputation;
 import de.featjar.analysis.sat4j.twise.CoverageStatistic;
 import de.featjar.analysis.sat4j.twise.RelativeTWiseCoverageComputation;
+import de.featjar.analysis.sat4j.twise.TWiseCoverageComputation;
 import de.featjar.base.cli.Option;
 import de.featjar.base.cli.OptionList;
-import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.IComputation;
 import de.featjar.base.io.IO;
 import de.featjar.base.io.format.IFormat;
@@ -100,33 +99,29 @@ public class TWiseCoverageCommand extends AAnalysisCommand<CoverageStatistic> {
                     + REFERENCE_SAMPLE_OPTION.getArgumentName() + " at the same time!");
         }
 
-        BooleanAssignmentList sample = IO.load(samplePath, BooleanAssignmentGroupsFormats.getInstance())
+        IComputation<BooleanAssignmentList> sample = IO.load(samplePath, BooleanAssignmentGroupsFormats.getInstance())
                 .map(BooleanAssignmentGroups::getFirstGroup)
-                .orElseThrow();
-        IComputation<BooleanAssignmentList> twiseSampleComputation = null;
+                .toComputation();
         if (fmPath != null) {
-            twiseSampleComputation = IO.load(fmPath, FormulaFormats.getInstance())
-                    .toComputation()
-                    .map(ComputeNNFFormula::new)
-                    .map(ComputeCNFFormula::new)
-                    .map(ComputeBooleanClauseList::new)
-                    .map(YASA::new)
-                    .set(YASA.T, t)
-                    .set(YASA.ITERATIONS, 0)
-                    .set(YASA.INCREMENTAL_T, Boolean.FALSE);
+            return sample.map(TWiseCoverageComputation::new)
+                    .set(
+                            TWiseCoverageComputation.BOOLEAN_CLAUSE_LIST,
+                            IO.load(fmPath, FormulaFormats.getInstance())
+                                    .toComputation()
+                                    .map(ComputeNNFFormula::new)
+                                    .map(ComputeCNFFormula::new)
+                                    .map(ComputeBooleanClauseList::new));
         } else if (referencePath != null) {
-            twiseSampleComputation = IO.load(referencePath, BooleanAssignmentGroupsFormats.getInstance())
-                    .map(BooleanAssignmentGroups::getFirstGroup)
-                    .toComputation();
-        } else {
-            return Computations.of(sample)
-                    .map(AbsoluteTWiseCoverageComputation::new)
+            return sample.map(RelativeTWiseCoverageComputation::new)
+                    .set(
+                            RelativeTWiseCoverageComputation.REFERENCE_SAMPLE,
+                            IO.load(referencePath, BooleanAssignmentGroupsFormats.getInstance())
+                                    .map(BooleanAssignmentGroups::getFirstGroup)
+                                    .toComputation())
                     .set(AbsoluteTWiseCoverageComputation.T, t);
+        } else {
+            return sample.map(AbsoluteTWiseCoverageComputation::new).set(AbsoluteTWiseCoverageComputation.T, t);
         }
-        return Computations.of(sample)
-                .map(RelativeTWiseCoverageComputation::new)
-                .set(RelativeTWiseCoverageComputation.REFERENCE_SAMPLE, twiseSampleComputation)
-                .set(AbsoluteTWiseCoverageComputation.T, t);
     }
 
     @Override

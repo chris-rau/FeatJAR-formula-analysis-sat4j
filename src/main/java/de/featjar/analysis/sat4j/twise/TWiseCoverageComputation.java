@@ -21,9 +21,12 @@
 package de.featjar.analysis.sat4j.twise;
 
 import de.featjar.analysis.RuntimeContradictionException;
+import de.featjar.analysis.RuntimeTimeoutException;
 import de.featjar.analysis.sat4j.computation.ASAT4JAnalysis;
+import de.featjar.analysis.sat4j.computation.ICombinationSpecification;
 import de.featjar.analysis.sat4j.computation.MIGBuilder;
-import de.featjar.analysis.sat4j.solver.IMIGVisitor;
+import de.featjar.analysis.sat4j.computation.NoneCombinationSpecification;
+import de.featjar.analysis.sat4j.computation.SingleCombinationSpecification;
 import de.featjar.analysis.sat4j.solver.ISelectionStrategy;
 import de.featjar.analysis.sat4j.solver.MIGVisitorByte;
 import de.featjar.analysis.sat4j.solver.ModalImplicationGraph;
@@ -33,15 +36,13 @@ import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.Dependency;
 import de.featjar.base.computation.IComputation;
 import de.featjar.base.computation.Progress;
-import de.featjar.base.data.Ints;
-import de.featjar.base.data.LexicographicIterator;
 import de.featjar.base.data.Result;
 import de.featjar.formula.assignment.BooleanAssignment;
 import de.featjar.formula.assignment.BooleanAssignmentList;
-import de.featjar.formula.assignment.BooleanSolution;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
+import java.util.stream.IntStream;
 
 /**
  * Calculates statistics regarding t-wise feature coverage of a set of
@@ -50,126 +51,114 @@ import java.util.Random;
  * @author Sebastian Krieter
  */
 public class TWiseCoverageComputation extends ASAT4JAnalysis<CoverageStatistic> {
-    public static final Dependency<Integer> T = Dependency.newDependency(Integer.class);
+
     public static final Dependency<BooleanAssignmentList> SAMPLE =
             Dependency.newDependency(BooleanAssignmentList.class);
+    public static final Dependency<Integer> T = Dependency.newDependency(Integer.class);
+    public static final Dependency<ICombinationSpecification> LITERALS =
+            Dependency.newDependency(ICombinationSpecification.class);
     public static final Dependency<ModalImplicationGraph> MIG = Dependency.newDependency(ModalImplicationGraph.class);
-    public static final Dependency<BooleanAssignment> FILTER = Dependency.newDependency(BooleanAssignment.class);
 
-    public class Environment {
-        private final CoverageStatistic statistic = new CoverageStatistic(t);
-        private final SAT4JSolutionSolver solver = initializeSolver(dependencyList);
-        private final IMIGVisitor visitor = new MIGVisitorByte(MIG.get(dependencyList));
-        private SampleListIndex sampleIndex = new SampleListIndex(sample, size, t);
-        private SampleListIndex randomIndex = new SampleListIndex(randomSample, size, t);
-
-        public CoverageStatistic getStatistic() {
-            return statistic;
-        }
-    }
-
-    public TWiseCoverageComputation(IComputation<BooleanAssignmentList> clauseList) {
+    public TWiseCoverageComputation(IComputation<BooleanAssignmentList> sample) {
         super(
-                clauseList, //
+                Computations.of(new BooleanAssignmentList(null, 0)),
+                sample,
                 Computations.of(2), //
-                Computations.of(new BooleanAssignmentList(null, 0)), //
-                new MIGBuilder(clauseList), //
-                Computations.of(new BooleanAssignment()));
+                Computations.of(new NoneCombinationSpecification()),
+                Computations.of(new Object()));
     }
 
     public TWiseCoverageComputation(TWiseCoverageComputation other) {
         super(other);
     }
 
-    private ArrayList<Environment> statisticList = new ArrayList<>();
-
-    private List<Object> dependencyList;
-    List<BooleanAssignment> sample;
-    private List<BooleanSolution> randomSample;
-    private int t, size;
+    private SampleBitIndex sampleIndex, randomSampleIndex;
+    private Random random;
+    private ModalImplicationGraph mig;
+    private SAT4JSolutionSolver solver;
 
     @Override
     public Result<CoverageStatistic> compute(List<Object> dependencyList, Progress progress) {
-        this.dependencyList = dependencyList;
-        sample = SAMPLE.get(dependencyList).getAll();
-        t = T.get(dependencyList);
+        BooleanAssignmentList sample = SAMPLE.get(dependencyList).toSolutionList();
+        random = new Random(RANDOM_SEED.get(dependencyList));
+        int t = T.get(dependencyList);
+        ICombinationSpecification variables = LITERALS.get(dependencyList);
 
-        if (!sample.isEmpty()) {
-            size = sample.get(0).size();
+        mig = new MIGBuilder(Computations.of(BOOLEAN_CLAUSE_LIST.get(dependencyList))).compute();
 
-            createRandomSample(dependencyList);
-
-            final int[] literals = Ints.filteredList(size, FILTER.get(dependencyList));
-            final int[] gray = Ints.grayCode(t);
-
-            LexicographicIterator.parallelStream(t, literals.length, this::createStatistic)
-                    .forEach(combo -> {
-                        int[] select = combo.getSelection(literals);
-                        for (int i = 0; i < gray.length; i++) {
-                            if (combo.environment.sampleIndex.test(select)) {
-                                combo.environment.statistic.incNumberOfCoveredConditions();
-                            } else if (isCombinationInvalidMIG(combo.environment, select)) {
-                                combo.environment.statistic.incNumberOfInvalidConditions();
-                            } else if (combo.environment.randomIndex.test(select)) {
-                                combo.environment.statistic.incNumberOfUncoveredConditions();
-                            } else if (isCombinationInvalidSAT(combo.environment, select)) {
-                                combo.environment.statistic.incNumberOfInvalidConditions();
-                            } else {
-                                combo.environment.statistic.incNumberOfUncoveredConditions();
-                            }
-                            int g = gray[i];
-                            select[g] = -select[g];
-                        }
-                    });
-        }
-        return Result.ofOptional(statisticList.stream() //
-                .map(Environment::getStatistic) //
-                .reduce((s1, s2) -> s1.merge(s2)));
-    }
-
-    private void createRandomSample(List<Object> dependencyList) {
-        randomSample = new ArrayList<>();
-        SAT4JSolutionSolver solver = initializeSolver(dependencyList);
-        Random random = new Random(RANDOM_SEED.get(dependencyList));
-        int limit = (int) Math.ceil(30 * Math.log(size));
+        solver = initializeSolver(dependencyList);
         solver.setSelectionStrategy(ISelectionStrategy.random(random));
-        for (int j = 0; j < limit; j++) {
-            if (solver.hasSolution().valueEquals(Boolean.TRUE)) {
-                randomSample.add(new BooleanSolution(solver.getInternalSolution(), false));
-                solver.shuffleOrder(random);
-            } else {
-                break;
+
+        int variableCount = sample.getVariableMap().getVariableCount();
+        sampleIndex = new SampleBitIndex(sample.getAll(), variableCount);
+        randomSampleIndex = new SampleBitIndex(variableCount);
+        final CoverageStatistic statistic = new CoverageStatistic(t);
+
+        if (variables instanceof NoneCombinationSpecification) {
+            variables = new SingleCombinationSpecification(
+                    new BooleanAssignment(new BooleanAssignment(IntStream.range(-variableCount, variableCount + 1)
+                                    .filter(i -> i != 0)
+                                    .toArray())
+                            .removeAllVariables(
+                                    Arrays.stream(mig.getCore()).map(Math::abs).toArray())),
+                    t);
+        }
+
+        progress.setTotalSteps(variables.getTotalSteps());
+
+        variables.shuffle(random);
+        variables.stream().forEach(combinationLiterals -> {
+            checkCancel();
+            progress.incrementCurrentStep();
+
+            if (randomSampleIndex.test(combinationLiterals)) {
+                if (sampleIndex.test(combinationLiterals)) {
+                    statistic.incNumberOfCoveredConditions();
+                } else {
+                    statistic.incNumberOfUncoveredConditions();
+                }
+                return;
             }
-        }
+            if (isCombinationInvalidMIG(combinationLiterals)) {
+                statistic.incNumberOfInvalidConditions();
+                return;
+            }
+            int orgAssignmentSize = solver.getAssignment().size();
+            try {
+                solver.getAssignment().addAll(combinationLiterals);
+                Result<Boolean> hasSolution = solver.hasSolution();
+                if (hasSolution.isPresent()) {
+                    if (hasSolution.get()) {
+                        int[] solution = solver.getInternalSolution();
+                        randomSampleIndex.addConfiguration(solution);
+                        solver.shuffleOrder(random);
+                        if (sampleIndex.test(combinationLiterals)) {
+                            statistic.incNumberOfCoveredConditions();
+                        } else {
+                            statistic.incNumberOfUncoveredConditions();
+                        }
+                    } else {
+                        statistic.incNumberOfInvalidConditions();
+                    }
+                } else {
+                    throw new RuntimeTimeoutException();
+                }
+            } finally {
+                solver.getAssignment().clear(orgAssignmentSize);
+            }
+        });
+
+        return Result.of(statistic);
     }
 
-    private Environment createStatistic() {
-        Environment env = new Environment();
-        synchronized (statisticList) {
-            statisticList.add(env);
-        }
-        return env;
-    }
-
-    private boolean isCombinationInvalidMIG(Environment env, int[] select) {
+    private boolean isCombinationInvalidMIG(int[] literals) {
         try {
-            env.visitor.propagate(select);
+            MIGVisitorByte visitor = new MIGVisitorByte(mig);
+            visitor.propagate(literals);
         } catch (RuntimeContradictionException e) {
             return true;
-        } finally {
-            env.visitor.reset();
         }
         return false;
-    }
-
-    private boolean isCombinationInvalidSAT(Environment env, int[] select) {
-        final int orgAssignmentLength = env.solver.getAssignment().size();
-        try {
-            env.solver.getAssignment().addAll(select);
-            return env.solver.hasSolution().valueEquals(Boolean.FALSE);
-        } finally {
-            env.solver.getAssignment().clear(orgAssignmentLength);
-        }
     }
 
     @Override
