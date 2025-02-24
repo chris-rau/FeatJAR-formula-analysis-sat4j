@@ -25,7 +25,10 @@ import de.featjar.analysis.sat4j.solver.ISelectionStrategy;
 import de.featjar.base.cli.Option;
 import de.featjar.base.cli.OptionList;
 import de.featjar.base.computation.IComputation;
+import de.featjar.base.io.format.IFormat;
+import de.featjar.formula.assignment.BooleanAssignmentGroups;
 import de.featjar.formula.assignment.BooleanAssignmentList;
+import de.featjar.formula.io.csv.BooleanSolutionListCSVFormat;
 import java.util.Optional;
 
 /**
@@ -39,7 +42,7 @@ public class SolutionsCommand extends ASAT4JAnalysisCommand<BooleanAssignmentLis
     /**
      * Maximum number of configurations to be generated.
      */
-    public static final Option<Integer> LIMIT_OPTION = Option.newOption("n", Option.IntegerParser) //
+    public static final Option<Integer> LIMIT_OPTION = Option.newOption("limit", Option.IntegerParser) //
             .setDescription("Maximum number of configurations to be generated.") //
             .setDefaultValue(1);
 
@@ -86,7 +89,17 @@ public class SolutionsCommand extends ASAT4JAnalysisCommand<BooleanAssignmentLis
     }
 
     @Override
-    public String serializeResult(BooleanAssignmentList list) {
+    protected Object getOuputObject(BooleanAssignmentList list) {
+        return new BooleanAssignmentGroups(list);
+    }
+
+    @Override
+    protected IFormat<?> getOuputFormat() {
+        return new BooleanSolutionListCSVFormat();
+    }
+
+    @Override
+    public String printResult(BooleanAssignmentList list) {
         return list.print();
     }
 

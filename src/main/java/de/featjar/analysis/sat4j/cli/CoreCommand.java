@@ -23,8 +23,11 @@ package de.featjar.analysis.sat4j.cli;
 import de.featjar.analysis.sat4j.computation.ComputeCoreDeadMIG;
 import de.featjar.base.cli.OptionList;
 import de.featjar.base.computation.IComputation;
+import de.featjar.base.io.format.IFormat;
 import de.featjar.formula.assignment.BooleanAssignment;
+import de.featjar.formula.assignment.BooleanAssignmentGroups;
 import de.featjar.formula.assignment.BooleanAssignmentList;
+import de.featjar.formula.io.csv.BooleanAssignmentGroupsCSVFormat;
 import java.util.Optional;
 
 /**
@@ -47,7 +50,17 @@ public class CoreCommand extends ASAT4JAnalysisCommand<BooleanAssignment, Boolea
     }
 
     @Override
-    public String serializeResult(BooleanAssignment assignment) {
+    protected Object getOuputObject(BooleanAssignment list) {
+        return variableMap == null ? null : new BooleanAssignmentGroups(variableMap, list);
+    }
+
+    @Override
+    protected IFormat<?> getOuputFormat() {
+        return new BooleanAssignmentGroupsCSVFormat();
+    }
+
+    @Override
+    public String printResult(BooleanAssignment assignment) {
         return assignment.print();
     }
 

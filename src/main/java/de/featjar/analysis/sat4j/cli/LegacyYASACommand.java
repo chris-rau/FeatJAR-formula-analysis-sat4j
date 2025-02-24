@@ -23,7 +23,6 @@ package de.featjar.analysis.sat4j.cli;
 import de.featjar.analysis.sat4j.computation.YASALegacy;
 import de.featjar.base.cli.Option;
 import de.featjar.base.cli.OptionList;
-import de.featjar.base.computation.AComputation;
 import de.featjar.base.computation.IComputation;
 import de.featjar.formula.assignment.BooleanAssignmentList;
 import java.util.Optional;
@@ -51,7 +50,7 @@ public class LegacyYASACommand extends ATWiseCommand {
     @Override
     public IComputation<BooleanAssignmentList> newAnalysis(
             OptionList optionParser, IComputation<BooleanAssignmentList> formula) {
-        AComputation<BooleanAssignmentList> analysis = formula.map(YASALegacy::new)
+        IComputation<BooleanAssignmentList> analysis = formula.map(YASALegacy::new)
                 .set(YASALegacy.T, optionParser.get(T_OPTION))
                 .set(YASALegacy.CONFIGURATION_LIMIT, optionParser.get(LIMIT_OPTION))
                 .set(YASALegacy.ITERATIONS, optionParser.get(ITERATIONS_OPTION))

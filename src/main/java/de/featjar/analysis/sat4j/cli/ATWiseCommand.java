@@ -23,8 +23,8 @@ package de.featjar.analysis.sat4j.cli;
 import de.featjar.base.FeatJAR;
 import de.featjar.base.cli.Option;
 import de.featjar.base.cli.OptionList;
-import de.featjar.base.computation.AComputation;
 import de.featjar.base.computation.Dependency;
+import de.featjar.base.computation.IComputation;
 import de.featjar.base.data.Result;
 import de.featjar.base.io.IO;
 import de.featjar.base.io.format.IFormat;
@@ -74,9 +74,9 @@ public abstract class ATWiseCommand extends ASAT4JAnalysisCommand<BooleanAssignm
 
     // TODO handle other combination specs
 
-    protected AComputation<BooleanAssignmentList> setInitialSample(
+    protected IComputation<BooleanAssignmentList> setInitialSample(
             OptionList optionParser,
-            AComputation<BooleanAssignmentList> analysis,
+            IComputation<BooleanAssignmentList> analysis,
             Dependency<BooleanAssignmentList> dependency) {
         Result<Path> initialSamplePath = optionParser.getResult(INITIAL_SAMPLE_OPTION);
         if (initialSamplePath.isPresent()) {
@@ -102,7 +102,7 @@ public abstract class ATWiseCommand extends ASAT4JAnalysisCommand<BooleanAssignm
     }
 
     @Override
-    public String serializeResult(BooleanAssignmentList assignments) {
+    public String printResult(BooleanAssignmentList assignments) {
         return assignments.serialize();
     }
 }

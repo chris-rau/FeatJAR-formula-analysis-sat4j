@@ -26,6 +26,7 @@ import de.featjar.base.cli.OptionList;
 import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.IComputation;
 import de.featjar.base.io.IO;
+import de.featjar.formula.VariableMap;
 import de.featjar.formula.assignment.BooleanAssignmentGroups;
 import de.featjar.formula.assignment.BooleanAssignmentList;
 import de.featjar.formula.assignment.ComputeBooleanClauseList;
@@ -33,7 +34,6 @@ import de.featjar.formula.computation.ComputeCNFFormula;
 import de.featjar.formula.computation.ComputeNNFFormula;
 import de.featjar.formula.io.BooleanAssignmentGroupsFormats;
 import de.featjar.formula.io.FormulaFormats;
-import de.featjar.formula.structure.IFormula;
 import java.nio.file.Path;
 import java.time.Duration;
 
@@ -55,21 +55,21 @@ public abstract class ASAT4JAnalysisCommand<T, U> extends AAnalysisCommand<T> {
             .setValidator(timeout -> !timeout.isNegative())
             .setDefaultValue(Duration.ZERO);
 
+    protected VariableMap variableMap;
+
     @Override
     protected IComputation<T> newComputation(OptionList optionParser) {
         Path inputPath = optionParser.getResult(INPUT_OPTION).orElseThrow();
-        IComputation<BooleanAssignmentList> computation;
         BooleanAssignmentGroups cnf =
                 IO.load(inputPath, BooleanAssignmentGroupsFormats.getInstance()).orElse(null);
-        if (cnf != null) {
-            computation = Computations.of(cnf.getFirstGroup().toClauseList());
-        } else {
-            IFormula formula = IO.load(inputPath, FormulaFormats.getInstance()).orElseThrow();
-            computation = Computations.of(formula)
-                    .map(ComputeNNFFormula::new)
-                    .map(ComputeCNFFormula::new)
-                    .map(ComputeBooleanClauseList::new);
-        }
+        IComputation<BooleanAssignmentList> computation = (cnf != null)
+                ? Computations.of(cnf.getFirstGroup().toClauseList())
+                : IO.load(inputPath, FormulaFormats.getInstance())
+                        .toComputation()
+                        .map(ComputeNNFFormula::new)
+                        .map(ComputeCNFFormula::new)
+                        .map(ComputeBooleanClauseList::new);
+        computation.peekResult(getClass(), "variableMap", clauseList -> variableMap = clauseList.getVariableMap());
         return newAnalysis(optionParser, computation);
     }
 

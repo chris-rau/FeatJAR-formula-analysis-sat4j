@@ -22,7 +22,6 @@ package de.featjar.analysis.sat4j.cli;
 
 import de.featjar.analysis.sat4j.computation.ComputeRandomTWiseSample;
 import de.featjar.base.cli.OptionList;
-import de.featjar.base.computation.AComputation;
 import de.featjar.base.computation.IComputation;
 import de.featjar.formula.assignment.BooleanAssignmentList;
 import java.util.Optional;
@@ -42,7 +41,7 @@ public class TWiseCommand extends ATWiseCommand {
     @Override
     public IComputation<BooleanAssignmentList> newAnalysis(
             OptionList optionParser, IComputation<BooleanAssignmentList> formula) {
-        AComputation<BooleanAssignmentList> analysis = formula.map(ComputeRandomTWiseSample::new)
+        IComputation<BooleanAssignmentList> analysis = formula.map(ComputeRandomTWiseSample::new)
                 .set(ComputeRandomTWiseSample.T, optionParser.get(T_OPTION))
                 .set(ComputeRandomTWiseSample.CONFIGURATION_LIMIT, optionParser.get(LIMIT_OPTION))
                 .set(
