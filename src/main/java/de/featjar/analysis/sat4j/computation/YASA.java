@@ -41,7 +41,6 @@ import java.util.BitSet;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.stream.IntStream;
 
 /**
  * YASA sampling algorithm. Generates configurations for a given propositional
@@ -88,7 +87,8 @@ public class YASA extends ATWiseSampleComputation {
         super(clauseList, Computations.of(1), Computations.of(65_536), Computations.of(Boolean.TRUE));
     }
 
-    private int minT, iterations, randomConfigurationLimit, curSolutionId, randomSampleIdsIndex;
+    private int iterations, randomConfigurationLimit, curSolutionId, randomSampleIdsIndex;
+    private boolean incrementalT;
     private List<PartialConfiguration> currentSample, selectionCandidates;
     private SampleBitIndex bestSampleIndex, currentSampleIndex, randomSampleIndex;
 
@@ -105,27 +105,34 @@ public class YASA extends ATWiseSampleComputation {
                     "Internal solution limit must be greater than 0. Value was " + randomConfigurationLimit);
         }
 
-        minT = INCREMENTAL_T.get(dependencyList) ? 1 : maxT;
+        incrementalT = INCREMENTAL_T.get(dependencyList);
 
         mig = MIG.get(dependencyList);
         randomSampleIndex = new SampleBitIndex(variableCount);
 
         selectionCandidates = new ArrayList<>();
 
-        if (variables instanceof NoneCombinationSpecification) {
-            variables = new SingleCombinationSpecification(
-                    new BooleanAssignment(new BooleanAssignment(IntStream.range(-variableCount, variableCount + 1)
-                                    .filter(i -> i != 0)
-                                    .toArray())
+        if (combinationsList.isEmpty()) {
+            combinationsList.add(new TWiseCombinations(
+                    new BooleanAssignment(variableMap
+                            .getVariables()
                             .removeAllVariables(
                                     Arrays.stream(mig.getCore()).map(Math::abs).toArray())),
-                    maxT);
+                    maxT));
         }
 
-        int count = variables.getTotalSteps();
-        for (int t = minT; t <= maxT; t++) {
-            count += iterations * (1 << t) * variables.forOtherT(t).getTotalSteps();
+        int count = 0;
+        for (TWiseCombinations combinations : combinationsList) {
+            count += (1 << maxT) * combinations.forOtherT(maxT).getTotalSteps();
         }
+        for (TWiseCombinations combinations : combinationsList) {
+            int minT = incrementalT ? 1 : combinations.getT();
+            for (int t = minT; t <= maxT; t++) {
+                long factor = iterations * (1 << t);
+                count += factor * combinations.forOtherT(t).getTotalSteps();
+            }
+        }
+
         progress.setTotalSteps(count);
 
         buildCombinations(progress);
@@ -167,19 +174,22 @@ public class YASA extends ATWiseSampleComputation {
             currentSampleIndex.addConfiguration(config);
         }
 
-        variables.shuffle(random);
-        variables.stream().forEach(combinationLiterals -> {
-            checkCancel();
-            monitor.incrementCurrentStep();
+        for (TWiseCombinations combinations : combinationsList) {
+            final int[] gray = Ints.grayCode(combinations.getT());
+            combinations.shuffle(random);
+            combinations.stream().forEach(combinationLiterals -> {
+                for (int g : gray) {
+                    checkCancel();
+                    monitor.incrementCurrentStep();
 
-            if (currentSampleIndex.test(combinationLiterals)) {
-                return;
-            }
-            if (isCombinationInvalidMIG(combinationLiterals)) {
-                return;
-            }
-            newRandomConfiguration(combinationLiterals);
-        });
+                    if (!currentSampleIndex.test(combinationLiterals)
+                            && !isCombinationInvalidMIG(combinationLiterals)) {
+                        newRandomConfiguration(combinationLiterals);
+                    }
+                    combinationLiterals[g] = -combinationLiterals[g];
+                }
+            });
+        }
         setBestSolutionList();
     }
 
@@ -213,27 +223,30 @@ public class YASA extends ATWiseSampleComputation {
             for (BooleanAssignment config : initialSample) {
                 newConfiguration(config.get(), allowChangeToInitialSample);
             }
-            for (int t = minT; t <= maxT; t++) {
-                final int[] gray = Ints.grayCode(t);
-                variables = variables.forOtherT(t);
-                variables.shuffle(random);
-                variables.stream().forEach(combinationLiterals -> {
-                    for (int g : gray) {
-                        checkCancel();
-                        monitor.incrementCurrentStep();
-                        if (!currentSampleIndex.test(combinationLiterals)
-                                && bestSampleIndex.test(combinationLiterals)) {
-                            getSelectionCandidates(combinationLiterals);
-                            if (selectionCandidates.isEmpty()
-                                    || (!tryCoverWithRandomSolutions(combinationLiterals)
-                                            && !tryCoverWithSat(combinationLiterals))) {
-                                newConfiguration(combinationLiterals, true);
+            for (TWiseCombinations combinations : combinationsList) {
+                int minT = incrementalT ? 1 : combinations.getT();
+                for (int t = minT; t <= combinations.getT(); t++) {
+                    final int[] gray = Ints.grayCode(t);
+                    combinations = combinations.forOtherT(t);
+                    combinations.shuffle(random);
+                    combinations.stream().forEach(combinationLiterals -> {
+                        for (int g : gray) {
+                            checkCancel();
+                            monitor.incrementCurrentStep();
+                            if (!currentSampleIndex.test(combinationLiterals)
+                                    && bestSampleIndex.test(combinationLiterals)) {
+                                getSelectionCandidates(combinationLiterals);
+                                if (selectionCandidates.isEmpty()
+                                        || (!tryCoverWithRandomSolutions(combinationLiterals)
+                                                && !tryCoverWithSat(combinationLiterals))) {
+                                    newConfiguration(combinationLiterals, true);
+                                }
+                                selectionCandidates.clear();
                             }
-                            selectionCandidates.clear();
+                            combinationLiterals[g] = -combinationLiterals[g];
                         }
-                        combinationLiterals[g] = -combinationLiterals[g];
-                    }
-                });
+                    });
+                }
             }
             setBestSolutionList();
         }

@@ -23,10 +23,9 @@ package de.featjar.analysis.sat4j.twise;
 import de.featjar.analysis.RuntimeContradictionException;
 import de.featjar.analysis.RuntimeTimeoutException;
 import de.featjar.analysis.sat4j.computation.ASAT4JAnalysis;
-import de.featjar.analysis.sat4j.computation.ICombinationSpecification;
 import de.featjar.analysis.sat4j.computation.MIGBuilder;
-import de.featjar.analysis.sat4j.computation.NoneCombinationSpecification;
-import de.featjar.analysis.sat4j.computation.SingleCombinationSpecification;
+import de.featjar.analysis.sat4j.computation.TWiseCombinations;
+import de.featjar.analysis.sat4j.computation.TWiseCombinations.TWiseCombinationsList;
 import de.featjar.analysis.sat4j.solver.ISelectionStrategy;
 import de.featjar.analysis.sat4j.solver.MIGVisitorByte;
 import de.featjar.analysis.sat4j.solver.ModalImplicationGraph;
@@ -36,13 +35,11 @@ import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.Dependency;
 import de.featjar.base.computation.IComputation;
 import de.featjar.base.computation.Progress;
+import de.featjar.base.data.Ints;
 import de.featjar.base.data.Result;
-import de.featjar.formula.assignment.BooleanAssignment;
 import de.featjar.formula.assignment.BooleanAssignmentList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
-import java.util.stream.IntStream;
 
 /**
  * Calculates statistics regarding t-wise feature coverage of a set of
@@ -55,8 +52,8 @@ public class TWiseCoverageComputation extends ASAT4JAnalysis<CoverageStatistic> 
     public static final Dependency<BooleanAssignmentList> SAMPLE =
             Dependency.newDependency(BooleanAssignmentList.class);
     public static final Dependency<Integer> T = Dependency.newDependency(Integer.class);
-    public static final Dependency<ICombinationSpecification> LITERALS =
-            Dependency.newDependency(ICombinationSpecification.class);
+    public static final Dependency<TWiseCombinationsList> COMBINATION_SPECS =
+            Dependency.newDependency(TWiseCombinationsList.class);
     public static final Dependency<ModalImplicationGraph> MIG = Dependency.newDependency(ModalImplicationGraph.class);
 
     public TWiseCoverageComputation(IComputation<BooleanAssignmentList> sample) {
@@ -64,7 +61,7 @@ public class TWiseCoverageComputation extends ASAT4JAnalysis<CoverageStatistic> 
                 Computations.of(new BooleanAssignmentList(null, 0)),
                 sample,
                 Computations.of(2), //
-                Computations.of(new NoneCombinationSpecification()),
+                Computations.of(new TWiseCombinationsList()),
                 Computations.of(new Object()));
     }
 
@@ -81,8 +78,12 @@ public class TWiseCoverageComputation extends ASAT4JAnalysis<CoverageStatistic> 
     public Result<CoverageStatistic> compute(List<Object> dependencyList, Progress progress) {
         BooleanAssignmentList sample = SAMPLE.get(dependencyList).toSolutionList();
         random = new Random(RANDOM_SEED.get(dependencyList));
-        int t = T.get(dependencyList);
-        ICombinationSpecification variables = LITERALS.get(dependencyList);
+
+        TWiseCombinationsList combinationsList = COMBINATION_SPECS.get(dependencyList);
+        int t = combinationsList.stream()
+                .mapToInt(TWiseCombinations::getT)
+                .max()
+                .orElse(T.get(dependencyList));
 
         mig = new MIGBuilder(Computations.of(BOOLEAN_CLAUSE_LIST.get(dependencyList))).compute();
 
@@ -92,61 +93,61 @@ public class TWiseCoverageComputation extends ASAT4JAnalysis<CoverageStatistic> 
         int variableCount = sample.getVariableMap().getVariableCount();
         sampleIndex = new SampleBitIndex(sample.getAll(), variableCount);
         randomSampleIndex = new SampleBitIndex(variableCount);
+        int[] grayCode = Ints.grayCode(t);
         final CoverageStatistic statistic = new CoverageStatistic(t);
 
-        if (variables instanceof NoneCombinationSpecification) {
-            variables = new SingleCombinationSpecification(
-                    new BooleanAssignment(new BooleanAssignment(IntStream.range(-variableCount, variableCount + 1)
-                                    .filter(i -> i != 0)
-                                    .toArray())
-                            .removeAllVariables(
-                                    Arrays.stream(mig.getCore()).map(Math::abs).toArray())),
-                    t);
+        if (combinationsList.isEmpty()) {
+            combinationsList.add(new TWiseCombinations(sample.getVariableMap().getVariables(), t));
         }
 
-        progress.setTotalSteps(variables.getTotalSteps());
+        for (TWiseCombinations combinations : combinationsList) {
+            progress.setTotalSteps((1 << t) * combinations.getTotalSteps());
+        }
 
-        variables.shuffle(random);
-        variables.stream().forEach(combinationLiterals -> {
-            checkCancel();
-            progress.incrementCurrentStep();
-
-            if (randomSampleIndex.test(combinationLiterals)) {
-                if (sampleIndex.test(combinationLiterals)) {
-                    statistic.incNumberOfCoveredConditions();
-                } else {
-                    statistic.incNumberOfUncoveredConditions();
-                }
-                return;
-            }
-            if (isCombinationInvalidMIG(combinationLiterals)) {
-                statistic.incNumberOfInvalidConditions();
-                return;
-            }
-            int orgAssignmentSize = solver.getAssignment().size();
-            try {
-                solver.getAssignment().addAll(combinationLiterals);
-                Result<Boolean> hasSolution = solver.hasSolution();
-                if (hasSolution.isPresent()) {
-                    if (hasSolution.get()) {
-                        int[] solution = solver.getInternalSolution();
-                        randomSampleIndex.addConfiguration(solution);
-                        solver.shuffleOrder(random);
+        for (TWiseCombinations combinations : combinationsList) {
+            combinations.shuffle(random);
+            combinations.stream().forEach(combinationLiterals -> {
+                checkCancel();
+                progress.incrementCurrentStep();
+                for (int g : grayCode) {
+                    if (randomSampleIndex.test(combinationLiterals)) {
                         if (sampleIndex.test(combinationLiterals)) {
                             statistic.incNumberOfCoveredConditions();
                         } else {
                             statistic.incNumberOfUncoveredConditions();
                         }
-                    } else {
+                    } else if (isCombinationInvalidMIG(combinationLiterals)) {
                         statistic.incNumberOfInvalidConditions();
+                    } else {
+
+                        int orgAssignmentSize = solver.getAssignment().size();
+                        try {
+                            solver.getAssignment().addAll(combinationLiterals);
+                            Result<Boolean> hasSolution = solver.hasSolution();
+                            if (hasSolution.isPresent()) {
+                                if (hasSolution.get()) {
+                                    int[] solution = solver.getInternalSolution();
+                                    randomSampleIndex.addConfiguration(solution);
+                                    solver.shuffleOrder(random);
+                                    if (sampleIndex.test(combinationLiterals)) {
+                                        statistic.incNumberOfCoveredConditions();
+                                    } else {
+                                        statistic.incNumberOfUncoveredConditions();
+                                    }
+                                } else {
+                                    statistic.incNumberOfInvalidConditions();
+                                }
+                            } else {
+                                throw new RuntimeTimeoutException();
+                            }
+                        } finally {
+                            solver.getAssignment().clear(orgAssignmentSize);
+                        }
                     }
-                } else {
-                    throw new RuntimeTimeoutException();
+                    combinationLiterals[g] = -combinationLiterals[g];
                 }
-            } finally {
-                solver.getAssignment().clear(orgAssignmentSize);
-            }
-        });
+            });
+        }
 
         return Result.of(statistic);
     }

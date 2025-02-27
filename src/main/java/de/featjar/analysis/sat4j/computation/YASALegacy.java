@@ -192,17 +192,15 @@ public class YASALegacy extends ATWiseSampleComputation {
 
         mig = MIG.get(dependencyList);
 
-        if (variables instanceof NoneCombinationSpecification) {
-            variables = new SingleCombinationSpecification(
-                    new BooleanAssignment(new BooleanAssignment(IntStream.range(-variableCount, variableCount + 1)
-                                    .filter(i -> i != 0)
-                                    .toArray())
-                            .removeAllVariables(
-                                    Arrays.stream(mig.getCore()).map(Math::abs).toArray())),
-                    maxT);
-        }
+        combinationsList.add(new TWiseCombinations(
+                new BooleanAssignment(new BooleanAssignment(IntStream.range(-variableCount, variableCount + 1)
+                                .filter(i -> i != 0)
+                                .toArray())
+                        .removeAllVariables(
+                                Arrays.stream(mig.getCore()).map(Math::abs).toArray())),
+                maxT));
 
-        progress.setTotalSteps(iterations * variables.getTotalSteps());
+        progress.setTotalSteps(iterations * combinationsList.get(0).getTotalSteps());
 
         buildCombinations(progress);
 
@@ -237,7 +235,7 @@ public class YASALegacy extends ATWiseSampleComputation {
         selectedSampleIndices = new ExpandableIntegerList[t];
         initRun();
 
-        variables.stream().forEach(combinationLiterals -> {
+        combinationsList.get(0).stream().forEach(combinationLiterals -> {
             checkCancel();
             monitor.incrementCurrentStep();
 
@@ -296,10 +294,10 @@ public class YASALegacy extends ATWiseSampleComputation {
 
         for (int j = 1; j < iterations; j++) {
             checkCancel();
-            variables.shuffle(random);
+            combinationsList.get(0).shuffle(random);
             initSample();
             initRun();
-            variables.stream().forEach(combinationLiterals -> {
+            combinationsList.get(0).stream().forEach(combinationLiterals -> {
                 checkCancel();
                 monitor.incrementCurrentStep();
                 if (isCovered(combinationLiterals, currentSampleIndices)) {

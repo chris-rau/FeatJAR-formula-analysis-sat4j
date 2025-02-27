@@ -29,6 +29,7 @@ import de.featjar.Common;
 import de.featjar.analysis.sat4j.computation.ComputeAtomicSetsSAT4J;
 import de.featjar.analysis.sat4j.computation.ComputeCoreSAT4J;
 import de.featjar.analysis.sat4j.computation.ComputeSolutionsSAT4J;
+import de.featjar.analysis.sat4j.computation.TWiseCombinations.TWiseCombinationsList;
 import de.featjar.analysis.sat4j.computation.YASALegacy;
 import de.featjar.analysis.sat4j.solver.ISelectionStrategy;
 import de.featjar.analysis.sat4j.twise.CoverageStatistic;
@@ -203,8 +204,9 @@ public class YASATest extends Common {
 
     private CoverageStatistic computeCoverageNew(
             int t, IComputation<BooleanAssignmentList> clauses, BooleanAssignmentList sample) {
-        CoverageStatistic statistic = clauses.map(TWiseCoverageComputation::new)
-                .set(TWiseCoverageComputation.SAMPLE, sample)
+        CoverageStatistic statistic = Computations.of(sample)
+                .map(TWiseCoverageComputation::new)
+                .set(TWiseCoverageComputation.BOOLEAN_CLAUSE_LIST, clauses)
                 .set(TWiseCoverageComputation.T, t)
                 .compute();
         FeatJAR.log().info("Computed Coverage (TWiseCoverageComputation)");
@@ -213,33 +215,47 @@ public class YASATest extends Common {
 
     private void computeCoverageVariants(
             int t, IComputation<BooleanAssignmentList> clauses, BooleanAssignmentList sample) {
-        BooleanAssignment core = clauses.map(ComputeCoreSAT4J::new).compute();
-        BooleanAssignment atomic = new BooleanAssignment(clauses.map(ComputeAtomicSetsSAT4J::new).compute().stream()
-                .skip(1)
-                .flatMapToInt(l -> Arrays.stream(l.get(), 1, l.get().length))
-                .toArray());
+        BooleanAssignmentList cnf = clauses.compute();
+        BooleanAssignment variables = cnf.getVariableMap().getVariables();
 
-        CoverageStatistic statisticNone = clauses.map(TWiseCoverageComputation::new)
-                .set(TWiseCoverageComputation.SAMPLE, sample)
+        BooleanAssignment core = Computations.of(cnf).map(ComputeCoreSAT4J::new).compute();
+        BooleanAssignment atomic =
+                new BooleanAssignment(Computations.of(cnf).map(ComputeAtomicSetsSAT4J::new).compute().stream()
+                        .skip(1)
+                        .flatMapToInt(l -> Arrays.stream(l.get(), 1, l.get().length))
+                        .toArray());
+
+        CoverageStatistic statisticNone = Computations.of(sample)
+                .map(TWiseCoverageComputation::new)
+                .set(TWiseCoverageComputation.BOOLEAN_CLAUSE_LIST, clauses)
                 .set(TWiseCoverageComputation.T, t)
                 .compute();
 
-        CoverageStatistic statisticCore = clauses.map(TWiseCoverageComputation::new)
-                .set(TWiseCoverageComputation.SAMPLE, sample)
+        CoverageStatistic statisticCore = Computations.of(sample)
+                .map(TWiseCoverageComputation::new)
+                .set(TWiseCoverageComputation.BOOLEAN_CLAUSE_LIST, clauses)
                 .set(TWiseCoverageComputation.T, t)
-                .set(TWiseCoverageComputation.FILTER, core)
+                .set(
+                        TWiseCoverageComputation.COMBINATION_SPECS,
+                        new TWiseCombinationsList(variables.removeAll(core), t))
                 .compute();
 
-        CoverageStatistic statisticAtomic = clauses.map(TWiseCoverageComputation::new)
-                .set(TWiseCoverageComputation.SAMPLE, sample)
+        CoverageStatistic statisticAtomic = Computations.of(sample)
+                .map(TWiseCoverageComputation::new)
+                .set(TWiseCoverageComputation.BOOLEAN_CLAUSE_LIST, clauses)
                 .set(TWiseCoverageComputation.T, t)
-                .set(TWiseCoverageComputation.FILTER, atomic)
+                .set(
+                        TWiseCoverageComputation.COMBINATION_SPECS,
+                        new TWiseCombinationsList(variables.removeAll(atomic), t))
                 .compute();
 
-        CoverageStatistic statisticCoreAtomic = clauses.map(TWiseCoverageComputation::new)
-                .set(TWiseCoverageComputation.SAMPLE, sample)
+        CoverageStatistic statisticCoreAtomic = Computations.of(sample)
+                .map(TWiseCoverageComputation::new)
+                .set(TWiseCoverageComputation.BOOLEAN_CLAUSE_LIST, clauses)
                 .set(TWiseCoverageComputation.T, t)
-                .set(TWiseCoverageComputation.FILTER, new BooleanAssignment(core.addAll(atomic.get())))
+                .set(
+                        TWiseCoverageComputation.COMBINATION_SPECS,
+                        new TWiseCombinationsList(variables.removeAll(core).removeAll(atomic), t))
                 .compute();
         FeatJAR.log().info("Coverage statisticNone: %f", statisticNone.coverage());
         FeatJAR.log().info("Coverage statisticCore: %f", statisticCore.coverage());

@@ -20,6 +20,7 @@
  */
 package de.featjar.analysis.sat4j.computation;
 
+import de.featjar.analysis.sat4j.computation.TWiseCombinations.TWiseCombinationsList;
 import de.featjar.analysis.sat4j.solver.ISelectionStrategy;
 import de.featjar.analysis.sat4j.solver.ModalImplicationGraph;
 import de.featjar.analysis.sat4j.solver.SAT4JSolutionSolver;
@@ -42,9 +43,11 @@ import java.util.Random;
  */
 public abstract class ATWiseSampleComputation extends ASAT4JAnalysis<BooleanAssignmentList> {
 
-    public static final Dependency<ICombinationSpecification> LITERALS =
-            Dependency.newDependency(ICombinationSpecification.class);
+    public static final Dependency<TWiseCombinationsList> COMBINATION_SPECS =
+            Dependency.newDependency(TWiseCombinationsList.class);
+
     public static final Dependency<Integer> T = Dependency.newDependency(Integer.class);
+
     public static final Dependency<Integer> CONFIGURATION_LIMIT = Dependency.newDependency(Integer.class);
     public static final Dependency<BooleanAssignmentList> INITIAL_SAMPLE =
             Dependency.newDependency(BooleanAssignmentList.class);
@@ -55,11 +58,13 @@ public abstract class ATWiseSampleComputation extends ASAT4JAnalysis<BooleanAssi
     public static final Dependency<Boolean> INITIAL_SAMPLE_COUNTS_TOWARDS_CONFIGURATION_LIMIT =
             Dependency.newDependency(Boolean.class);
 
+    public static final int DEFAULT_T = 1;
+
     public ATWiseSampleComputation(IComputation<BooleanAssignmentList> clauseList, Object... computations) {
         super(
                 clauseList,
-                Computations.of(new NoneCombinationSpecification()),
-                Computations.of(1),
+                Computations.of(new TWiseCombinationsList()),
+                Computations.of(DEFAULT_T),
                 Computations.of(Integer.MAX_VALUE),
                 Computations.of(new BooleanAssignmentList((VariableMap) null)),
                 new MIGBuilder(clauseList),
@@ -74,18 +79,20 @@ public abstract class ATWiseSampleComputation extends ASAT4JAnalysis<BooleanAssi
 
     protected int maxT, maxSampleSize, variableCount;
     protected boolean allowChangeToInitialSample, initialSampleCountsTowardsConfigurationLimit;
-    protected ICombinationSpecification variables;
+    protected TWiseCombinationsList combinationsList;
 
     protected SAT4JSolutionSolver solver;
     protected VariableMap variableMap;
     protected Random random;
     protected ModalImplicationGraph mig;
 
+    // TODO change to SampleBitIndex
     protected BooleanAssignmentList initialSample;
 
     @Override
     public final Result<BooleanAssignmentList> compute(List<Object> dependencyList, Progress progress) {
-        maxT = T.get(dependencyList);
+        combinationsList = COMBINATION_SPECS.get(dependencyList);
+        maxT = combinationsList.stream().mapToInt(TWiseCombinations::getT).max().orElse(T.get(dependencyList));
         if (maxT < 1) {
             throw new IllegalArgumentException("Value for t must be grater than 0. Value was " + maxT);
         }
@@ -103,8 +110,6 @@ public abstract class ATWiseSampleComputation extends ASAT4JAnalysis<BooleanAssi
         allowChangeToInitialSample = ALLOW_CHANGE_TO_INITIAL_SAMPLE.get(dependencyList);
         initialSampleCountsTowardsConfigurationLimit =
                 INITIAL_SAMPLE_COUNTS_TOWARDS_CONFIGURATION_LIMIT.get(dependencyList);
-
-        variables = LITERALS.get(dependencyList);
 
         variableMap = BOOLEAN_CLAUSE_LIST.get(dependencyList).getVariableMap();
         variableCount = variableMap.getVariableCount();
