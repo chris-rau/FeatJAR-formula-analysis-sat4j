@@ -28,7 +28,6 @@ import de.featjar.formula.assignment.BooleanSolution;
 import java.util.List;
 
 public class ComputeSolutionSAT4J extends ASAT4JAnalysis.Solution<BooleanSolution> {
-    // TODO Add dependency of selection strategy
 
     public ComputeSolutionSAT4J(IComputation<BooleanAssignmentList> clauseList) {
         super(clauseList);

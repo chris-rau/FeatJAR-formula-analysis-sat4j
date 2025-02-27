@@ -56,6 +56,8 @@ public class ComputeSolutionsSAT4J extends ASAT4JAnalysis.Solution<BooleanAssign
     public Result<BooleanAssignmentList> compute(List<Object> dependencyList, Progress progress) {
         SAT4JSolutionSolver solver = (SAT4JSolutionSolver) initializeSolver(dependencyList);
         int limit = LIMIT.get(dependencyList);
+        progress.setTotalSteps(limit);
+        checkCancel();
         boolean forbid = FORBID_DUPLICATES.get(dependencyList);
         final Strategy strategy = SELECTION_STRATEGY.get(dependencyList);
         Random random = null;
@@ -78,6 +80,8 @@ public class ComputeSolutionsSAT4J extends ASAT4JAnalysis.Solution<BooleanAssign
         VariableMap variableMap = BOOLEAN_CLAUSE_LIST.get(dependencyList).getVariableMap();
         BooleanAssignmentList solutionList = new BooleanAssignmentList(variableMap);
         while (solutionList.size() < limit) {
+            progress.incrementCurrentStep();
+            checkCancel();
             Result<BooleanSolution> solution = solver.findSolution();
             if (solution.isEmpty()) {
                 break;

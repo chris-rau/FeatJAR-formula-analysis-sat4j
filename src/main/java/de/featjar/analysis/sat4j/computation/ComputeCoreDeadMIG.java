@@ -61,12 +61,19 @@ public class ComputeCoreDeadMIG extends ASAT4JAnalysis.Solution<BooleanAssignmen
     public Result<BooleanAssignment> compute(List<Object> dependencyList, Progress progress) {
         SAT4JSolutionSolver solver = initializeSolver(dependencyList);
         Random random = new Random(RANDOM_SEED.get(dependencyList));
+        BooleanAssignmentList clauseList = BOOLEAN_CLAUSE_LIST.get(dependencyList);
         BooleanAssignment assignment = ASSUMED_ASSIGNMENT.get(dependencyList);
         BooleanAssignment variablesOfInterest = VARIABLES_OF_INTEREST.get(dependencyList);
         ModalImplicationGraph mig = MIG.get(dependencyList);
 
+        progress.setTotalSteps(clauseList.getVariableMap().getVariableCount() + 2);
+        checkCancel();
+
         solver.setSelectionStrategy(ISelectionStrategy.positive()); // TODO: fails for berkeley db
         Result<BooleanSolution> solution = solver.findSolution();
+        progress.incrementCurrentStep();
+        checkCancel();
+
         if (solution.isEmpty()) return Result.empty();
         int[] model1 = solution.get().get();
 
@@ -84,6 +91,9 @@ public class ComputeCoreDeadMIG extends ASAT4JAnalysis.Solution<BooleanAssignmen
                 model1 = model3;
             }
 
+            progress.incrementCurrentStep();
+            checkCancel();
+
             IMIGVisitor visitor = new MIGVisitorByte(mig);
             visitor.propagate(assignment.get());
 
@@ -93,6 +103,8 @@ public class ComputeCoreDeadMIG extends ASAT4JAnalysis.Solution<BooleanAssignmen
             }
 
             for (int i = 0; i < model1.length; i++) {
+                progress.incrementCurrentStep();
+                checkCancel();
                 final int varX = model1[i];
                 if (varX != 0) {
                     solver.getAssignment().add(-varX);
