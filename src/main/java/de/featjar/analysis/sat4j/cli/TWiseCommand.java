@@ -20,7 +20,7 @@
  */
 package de.featjar.analysis.sat4j.cli;
 
-import de.featjar.analysis.sat4j.computation.ComputeRandomTWiseSample;
+import de.featjar.analysis.sat4j.computation.YASA;
 import de.featjar.base.cli.OptionList;
 import de.featjar.base.computation.IComputation;
 import de.featjar.formula.assignment.BooleanAssignmentList;
@@ -41,15 +41,16 @@ public class TWiseCommand extends ATWiseCommand {
     @Override
     public IComputation<BooleanAssignmentList> newAnalysis(
             OptionList optionParser, IComputation<BooleanAssignmentList> formula) {
-        IComputation<BooleanAssignmentList> analysis = formula.map(ComputeRandomTWiseSample::new)
-                .set(ComputeRandomTWiseSample.T, optionParser.get(T_OPTION))
-                .set(ComputeRandomTWiseSample.CONFIGURATION_LIMIT, optionParser.get(LIMIT_OPTION))
+        IComputation<BooleanAssignmentList> analysis = formula.map(YASA::new)
+                .set(YASA.T, optionParser.get(T_OPTION))
+                .set(YASA.ITERATIONS, 0)
+                .set(YASA.CONFIGURATION_LIMIT, optionParser.get(LIMIT_OPTION))
                 .set(
-                        ComputeRandomTWiseSample.INITIAL_SAMPLE_COUNTS_TOWARDS_CONFIGURATION_LIMIT,
+                        YASA.INITIAL_SAMPLE_COUNTS_TOWARDS_CONFIGURATION_LIMIT,
                         optionParser.get(INITIAL_SAMPLE_COUNTS_TOWARDS_CONFIGURATION_LIMIT))
-                .set(ComputeRandomTWiseSample.RANDOM_SEED, optionParser.get(RANDOM_SEED_OPTION))
-                .set(ComputeRandomTWiseSample.SAT_TIMEOUT, optionParser.get(SAT_TIMEOUT_OPTION));
-        return setInitialSample(optionParser, analysis, ComputeRandomTWiseSample.INITIAL_SAMPLE);
+                .set(YASA.RANDOM_SEED, optionParser.get(RANDOM_SEED_OPTION))
+                .set(YASA.SAT_TIMEOUT, optionParser.get(SAT_TIMEOUT_OPTION));
+        return setInitialSample(optionParser, analysis, YASA.INITIAL_SAMPLE);
     }
 
     @Override
