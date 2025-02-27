@@ -41,9 +41,21 @@ import de.featjar.formula.computation.ComputeCNFFormula;
 import de.featjar.formula.computation.ComputeNNFFormula;
 import de.featjar.formula.structure.IFormula;
 import java.time.Duration;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 public class YASAIncrementalTest extends Common {
+
+    @BeforeAll
+    public static void begin() {
+        FeatJAR.testConfiguration().initialize();
+    }
+
+    @AfterAll
+    public static void end() {
+        FeatJAR.deinitialize();
+    }
 
     @Test
     void formulaHas1WiseCoverage() {
@@ -187,8 +199,9 @@ public class YASAIncrementalTest extends Common {
 
     private CoverageStatistic computeCoverageNew(
             int t, IComputation<BooleanAssignmentList> clauses, BooleanAssignmentList sample) {
-        CoverageStatistic statistic = clauses.map(TWiseCoverageComputation::new)
-                .set(TWiseCoverageComputation.SAMPLE, sample)
+        CoverageStatistic statistic = Computations.of(sample)
+                .map(TWiseCoverageComputation::new)
+                .set(TWiseCoverageComputation.BOOLEAN_CLAUSE_LIST, clauses)
                 .set(TWiseCoverageComputation.T, t)
                 .compute();
         FeatJAR.log().info("Computed Coverage (TWiseCoverageComputation)");
