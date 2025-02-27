@@ -225,7 +225,8 @@ public class YASA extends ATWiseSampleComputation {
             }
             for (TWiseCombinations combinations : combinationsList) {
                 int minT = incrementalT ? 1 : combinations.getT();
-                for (int t = minT; t <= combinations.getT(); t++) {
+                int maxT = combinations.getT();
+                for (int t = minT; t <= maxT; t++) {
                     final int[] gray = Ints.grayCode(t);
                     combinations = combinations.forOtherT(t);
                     combinations.shuffle(random);
