@@ -22,9 +22,11 @@ package de.featjar.analysis.sat4j.computation;
 
 import de.featjar.analysis.RuntimeContradictionException;
 import de.featjar.analysis.RuntimeTimeoutException;
+import de.featjar.analysis.sat4j.solver.IMIGVisitor;
+import de.featjar.analysis.sat4j.solver.MIGVisitorBitSet;
 import de.featjar.analysis.sat4j.solver.MIGVisitorByte;
-import de.featjar.analysis.sat4j.solver.MIGVisitorLight;
 import de.featjar.analysis.sat4j.solver.ModalImplicationGraph;
+import de.featjar.analysis.sat4j.solver.SAT4JAssignment;
 import de.featjar.analysis.sat4j.twise.SampleBitIndex;
 import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.Dependency;
@@ -53,14 +55,14 @@ public class YASA extends ATWiseSampleComputation {
     private static class PartialConfiguration {
         private final int id;
         private final boolean allowChange;
-        private final MIGVisitorLight visitor;
+        private final IMIGVisitor visitor;
 
         private int randomCount;
 
         public PartialConfiguration(int id, boolean allowChange, ModalImplicationGraph mig, int... newliterals) {
             this.id = id;
             this.allowChange = allowChange;
-            visitor = new MIGVisitorLight(mig);
+            visitor = new MIGVisitorBitSet(mig);
             if (allowChange) {
                 visitor.propagate(newliterals);
             } else {
@@ -194,9 +196,8 @@ public class YASA extends ATWiseSampleComputation {
     }
 
     private void newRandomConfiguration(final int[] fixedLiterals) {
-        int orgAssignmentSize = solver.getAssignment().size();
+        int orgAssignmentSize = setUpSolver(fixedLiterals);
         try {
-            solver.getAssignment().addAll(fixedLiterals);
             Result<Boolean> hasSolution = solver.hasSolution();
             if (hasSolution.isPresent()) {
                 if (hasSolution.get()) {
@@ -216,7 +217,7 @@ public class YASA extends ATWiseSampleComputation {
     }
 
     private void rebuildCombinations(Progress monitor) {
-        for (int j = 1; j < iterations; j++) {
+        for (int j = 0; j < iterations; j++) {
             curSolutionId = 0;
             currentSample = new ArrayList<>();
             currentSampleIndex = new SampleBitIndex(variableCount);
@@ -399,9 +400,10 @@ public class YASA extends ATWiseSampleComputation {
     }
 
     private int setUpSolver(int[] configuration) {
-        final int orgAssignmentSize = solver.getAssignment().size();
+        SAT4JAssignment assignment = solver.getAssignment();
+        final int orgAssignmentSize = assignment.size();
         for (int i = 0; i < configuration.length; i++) {
-            solver.getAssignment().add(configuration[i]);
+            assignment.add(configuration[i]);
         }
         return orgAssignmentSize;
     }
