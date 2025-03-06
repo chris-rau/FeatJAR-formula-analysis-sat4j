@@ -27,7 +27,6 @@ import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.IComputation;
 import de.featjar.base.io.IO;
 import de.featjar.formula.VariableMap;
-import de.featjar.formula.assignment.BooleanAssignmentGroups;
 import de.featjar.formula.assignment.BooleanAssignmentList;
 import de.featjar.formula.assignment.ComputeBooleanClauseList;
 import de.featjar.formula.computation.ComputeCNFFormula;
@@ -60,15 +59,15 @@ public abstract class ASAT4JAnalysisCommand<T, U> extends AAnalysisCommand<T> {
     @Override
     protected IComputation<T> newComputation(OptionList optionParser) {
         Path inputPath = optionParser.getResult(INPUT_OPTION).orElseThrow();
-        BooleanAssignmentGroups cnf =
-                IO.load(inputPath, BooleanAssignmentGroupsFormats.getInstance()).orElse(null);
-        IComputation<BooleanAssignmentList> computation = (cnf != null)
-                ? Computations.of(cnf.getFirstGroup().toClauseList())
-                : IO.load(inputPath, FormulaFormats.getInstance())
+        IComputation<BooleanAssignmentList> computation = IO.load(
+                        inputPath, BooleanAssignmentGroupsFormats.getInstance())
+                .map(cnf -> (IComputation<BooleanAssignmentList>)
+                        Computations.of(cnf.getFirstGroup().toClauseList()))
+                .orElseGet(() -> IO.load(inputPath, FormulaFormats.getInstance())
                         .toComputation()
                         .map(ComputeNNFFormula::new)
                         .map(ComputeCNFFormula::new)
-                        .map(ComputeBooleanClauseList::new);
+                        .map(ComputeBooleanClauseList::new));
         computation.peekResult(getClass(), "variableMap", clauseList -> variableMap = clauseList.getVariableMap());
         return newAnalysis(optionParser, computation);
     }

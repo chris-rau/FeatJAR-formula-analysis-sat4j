@@ -27,6 +27,7 @@ import de.featjar.analysis.sat4j.twise.RelativeTWiseCoverageComputation;
 import de.featjar.analysis.sat4j.twise.TWiseCoverageComputation;
 import de.featjar.base.cli.Option;
 import de.featjar.base.cli.OptionList;
+import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.IComputation;
 import de.featjar.base.io.IO;
 import de.featjar.base.io.format.IFormat;
@@ -106,11 +107,14 @@ public class TWiseCoverageCommand extends AAnalysisCommand<CoverageStatistic> {
             return sample.map(TWiseCoverageComputation::new)
                     .set(
                             TWiseCoverageComputation.BOOLEAN_CLAUSE_LIST,
-                            IO.load(fmPath, FormulaFormats.getInstance())
-                                    .toComputation()
-                                    .map(ComputeNNFFormula::new)
-                                    .map(ComputeCNFFormula::new)
-                                    .map(ComputeBooleanClauseList::new));
+                            IO.load(fmPath, BooleanAssignmentGroupsFormats.getInstance())
+                                    .map(cnf -> (IComputation<BooleanAssignmentList>)
+                                            Computations.of(cnf.getFirstGroup().toClauseList()))
+                                    .orElseGet(() -> IO.load(fmPath, FormulaFormats.getInstance())
+                                            .toComputation()
+                                            .map(ComputeNNFFormula::new)
+                                            .map(ComputeCNFFormula::new)
+                                            .map(ComputeBooleanClauseList::new)));
         } else if (referencePath != null) {
             return sample.map(RelativeTWiseCoverageComputation::new)
                     .set(
