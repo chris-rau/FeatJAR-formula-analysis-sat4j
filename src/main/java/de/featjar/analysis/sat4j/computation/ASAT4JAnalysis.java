@@ -28,6 +28,7 @@ import de.featjar.base.computation.AComputation;
 import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.Dependency;
 import de.featjar.base.computation.IComputation;
+import de.featjar.formula.VariableMap;
 import de.featjar.formula.assignment.BooleanAssignment;
 import de.featjar.formula.assignment.BooleanAssignmentList;
 import java.time.Duration;
@@ -59,17 +60,45 @@ public abstract class ASAT4JAnalysis<T> extends AComputation<T> {
 
     protected abstract SAT4JSolver newSolver(BooleanAssignmentList clauseList);
 
-    @SuppressWarnings("unchecked")
     public <U extends SAT4JSolver> U initializeSolver(List<Object> dependencyList, boolean empty) {
         BooleanAssignmentList clauseList = BOOLEAN_CLAUSE_LIST.get(dependencyList);
         BooleanAssignment assumedAssignment = ASSUMED_ASSIGNMENT.get(dependencyList);
         BooleanAssignmentList assumedClauseList = ASSUMED_CLAUSE_LIST.get(dependencyList);
         Duration timeout = SAT_TIMEOUT.get(dependencyList);
+        return empty
+                ? initializeSolver(clauseList.getVariableMap(), assumedAssignment, assumedClauseList, timeout)
+                : initializeSolver(clauseList, assumedAssignment, assumedClauseList, timeout);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <U extends SAT4JSolver> U initializeSolver(
+            BooleanAssignmentList clauseList,
+            BooleanAssignment assumedAssignment,
+            BooleanAssignmentList assumedClauseList,
+            Duration timeout) {
         FeatJAR.log().debug("initializing SAT4J");
         FeatJAR.log().debug("clauses %s", clauseList);
         FeatJAR.log().debug("assuming %s", assumedAssignment);
         FeatJAR.log().debug("assuming %s", assumedClauseList);
-        U solver = (U) newSolver(empty ? new BooleanAssignmentList(clauseList.getVariableMap()) : clauseList);
+        U solver = (U) newSolver(clauseList);
+        solver.getClauseList().addAll(assumedClauseList);
+        solver.getAssignment().addAll(assumedAssignment);
+        solver.setTimeout(timeout);
+        solver.setGlobalTimeout(true);
+        return solver;
+    }
+
+    @SuppressWarnings("unchecked")
+    public <U extends SAT4JSolver> U initializeSolver(
+            VariableMap variableMap,
+            BooleanAssignment assumedAssignment,
+            BooleanAssignmentList assumedClauseList,
+            Duration timeout) {
+        FeatJAR.log().debug("initializing empty SAT4J");
+        FeatJAR.log().debug("variables %s", variableMap);
+        FeatJAR.log().debug("assuming %s", assumedAssignment);
+        FeatJAR.log().debug("assuming %s", assumedClauseList);
+        U solver = (U) newSolver(new BooleanAssignmentList(variableMap));
         solver.getClauseList().addAll(assumedClauseList);
         solver.getAssignment().addAll(assumedAssignment);
         solver.setTimeout(timeout);

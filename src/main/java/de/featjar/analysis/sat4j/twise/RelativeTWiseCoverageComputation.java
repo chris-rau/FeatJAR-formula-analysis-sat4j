@@ -24,6 +24,7 @@ import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.Dependency;
 import de.featjar.base.computation.IComputation;
 import de.featjar.base.data.Combination;
+import de.featjar.formula.VariableMap;
 import de.featjar.formula.assignment.BooleanAssignmentList;
 import java.util.List;
 import java.util.Objects;
@@ -53,7 +54,14 @@ public class RelativeTWiseCoverageComputation extends ATWiseCoverageComputation 
         super.init(dependencyList);
         BooleanAssignmentList referenceSample =
                 REFERENCE_SAMPLE.get(dependencyList).toSolutionList();
-        if (!Objects.equals(referenceSample.getVariableMap(), sample.getVariableMap())) {
+        VariableMap referenceVariableMap = referenceSample.getVariableMap();
+        VariableMap sampleVariableMap = sample.getVariableMap();
+        if (!Objects.equals(referenceVariableMap, sampleVariableMap)) {
+            throw new IllegalArgumentException("Variable map of reference sample is different from given sample.");
+        } else if (referenceVariableMap.containsAllObjects(sampleVariableMap)
+                && sampleVariableMap.containsAllObjects(referenceVariableMap)) {
+            referenceSample.adapt(sampleVariableMap);
+        } else {
             throw new IllegalArgumentException("Variable map of reference sample is different from given sample.");
         }
         referenceIndex = new SampleBitIndex(referenceSample.getAll(), size);

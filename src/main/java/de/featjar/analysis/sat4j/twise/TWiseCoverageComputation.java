@@ -37,8 +37,12 @@ import de.featjar.base.computation.IComputation;
 import de.featjar.base.computation.Progress;
 import de.featjar.base.data.Ints;
 import de.featjar.base.data.Result;
+import de.featjar.formula.VariableMap;
+import de.featjar.formula.assignment.BooleanAssignment;
 import de.featjar.formula.assignment.BooleanAssignmentList;
+import java.time.Duration;
 import java.util.List;
+import java.util.Objects;
 import java.util.Random;
 
 /**
@@ -85,31 +89,52 @@ public class TWiseCoverageComputation extends ASAT4JAnalysis<CoverageStatistic> 
                 .max()
                 .orElse(T.get(dependencyList));
 
-        mig = new MIGBuilder(Computations.of(BOOLEAN_CLAUSE_LIST.get(dependencyList))).compute();
+        BooleanAssignmentList clauseList = BOOLEAN_CLAUSE_LIST.get(dependencyList);
+        BooleanAssignment assumedAssignment = ASSUMED_ASSIGNMENT.get(dependencyList);
+        BooleanAssignmentList assumedClauseList = ASSUMED_CLAUSE_LIST.get(dependencyList);
+        Duration timeout = SAT_TIMEOUT.get(dependencyList);
 
-        solver = initializeSolver(dependencyList);
+        VariableMap cnfVariableMap = clauseList.getVariableMap();
+        VariableMap sampleVariableMap = sample.getVariableMap();
+
+        if (Objects.equals(cnfVariableMap, sampleVariableMap)) {
+            solver = initializeSolver(clauseList, assumedAssignment, assumedClauseList, timeout);
+        } else {
+            if (cnfVariableMap.containsAllObjects(sampleVariableMap)
+                    && sampleVariableMap.containsAllObjects(cnfVariableMap)) {
+                clauseList = clauseList.adapt(sampleVariableMap);
+                solver = initializeSolver(
+                        clauseList,
+                        assumedAssignment.adapt(cnfVariableMap, sampleVariableMap),
+                        assumedClauseList.adapt(sampleVariableMap),
+                        timeout);
+            } else {
+                throw new IllegalArgumentException("Variable map of feature model is different from given sample.");
+            }
+        }
         solver.setSelectionStrategy(ISelectionStrategy.random(random));
+        mig = new MIGBuilder(Computations.of(clauseList)).compute();
 
-        int variableCount = sample.getVariableMap().getVariableCount();
+        int variableCount = sampleVariableMap.getVariableCount();
         sampleIndex = new SampleBitIndex(sample.getAll(), variableCount);
         randomSampleIndex = new SampleBitIndex(variableCount);
-        int[] grayCode = Ints.grayCode(t);
         final CoverageStatistic statistic = new CoverageStatistic(t);
 
         if (combinationsList.isEmpty()) {
-            combinationsList.add(new TWiseCombinations(sample.getVariableMap().getVariables(), t));
+            combinationsList.add(new TWiseCombinations(sampleVariableMap.getVariables(), t));
         }
 
         for (TWiseCombinations combinations : combinationsList) {
-            progress.setTotalSteps((1 << t) * combinations.getTotalSteps());
+            progress.setTotalSteps((1 << combinations.getT()) * combinations.getTotalSteps());
         }
 
         for (TWiseCombinations combinations : combinationsList) {
+            int[] grayCode = Ints.grayCode(combinations.getT());
             combinations.shuffle(random);
             combinations.stream().forEach(combinationLiterals -> {
-                checkCancel();
-                progress.incrementCurrentStep();
                 for (int g : grayCode) {
+                    checkCancel();
+                    progress.incrementCurrentStep();
                     if (randomSampleIndex.test(combinationLiterals)) {
                         if (sampleIndex.test(combinationLiterals)) {
                             statistic.incNumberOfCoveredConditions();
@@ -119,21 +144,20 @@ public class TWiseCoverageComputation extends ASAT4JAnalysis<CoverageStatistic> 
                     } else if (isCombinationInvalidMIG(combinationLiterals)) {
                         statistic.incNumberOfInvalidConditions();
                     } else {
-
                         int orgAssignmentSize = solver.getAssignment().size();
+                        solver.getAssignment().addAll(combinationLiterals);
                         try {
-                            solver.getAssignment().addAll(combinationLiterals);
                             Result<Boolean> hasSolution = solver.hasSolution();
                             if (hasSolution.isPresent()) {
                                 if (hasSolution.get()) {
                                     int[] solution = solver.getInternalSolution();
                                     randomSampleIndex.addConfiguration(solution);
-                                    solver.shuffleOrder(random);
                                     if (sampleIndex.test(combinationLiterals)) {
                                         statistic.incNumberOfCoveredConditions();
                                     } else {
                                         statistic.incNumberOfUncoveredConditions();
                                     }
+                                    solver.shuffleOrder(random);
                                 } else {
                                     statistic.incNumberOfInvalidConditions();
                                 }
