@@ -52,7 +52,7 @@ public class ComputeRedundantClausesSat4J extends ASAT4JAnalysis.Solution<Boolea
     @Override
     public Result<BooleanAssignmentList> compute(List<Object> dependencyList, Progress progress) {
         BooleanAssignmentList clauseList = BOOLEAN_CLAUSE_LIST.get(dependencyList);
-        SAT4JSolutionSolver solver = initializeSolver(dependencyList, true);
+        SAT4JSolutionSolver solver = createSolver(dependencyList, true);
         final ArrayList<BooleanAssignment> result = new ArrayList<>();
 
         for (BooleanAssignment clause : clauseList) {

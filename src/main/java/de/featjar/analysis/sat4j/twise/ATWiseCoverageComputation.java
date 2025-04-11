@@ -20,19 +20,25 @@
  */
 package de.featjar.analysis.sat4j.twise;
 
+import de.featjar.base.FeatJAR;
 import de.featjar.base.computation.AComputation;
 import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.Dependency;
 import de.featjar.base.computation.IComputation;
 import de.featjar.base.computation.Progress;
-import de.featjar.base.data.Combination;
+import de.featjar.base.data.BinomialCalculator;
+import de.featjar.base.data.ICombination;
+import de.featjar.base.data.IntegerList;
 import de.featjar.base.data.Ints;
-import de.featjar.base.data.LexicographicIterator;
 import de.featjar.base.data.Result;
+import de.featjar.base.data.SingleLexicographicIterator;
+import de.featjar.formula.VariableMap;
 import de.featjar.formula.assignment.BooleanAssignment;
 import de.featjar.formula.assignment.BooleanAssignmentList;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Stream;
 
 /**
  * Calculates statistics regarding t-wise feature coverage of a set of
@@ -44,22 +50,18 @@ public abstract class ATWiseCoverageComputation extends AComputation<CoverageSta
 
     public static final Dependency<BooleanAssignmentList> SAMPLE =
             Dependency.newDependency(BooleanAssignmentList.class);
-    public static final Dependency<Integer> T = Dependency.newDependency(Integer.class);
-    public static final Dependency<BooleanAssignment> FILTER = Dependency.newDependency(BooleanAssignment.class);
-
-    public class Environment {
-        final CoverageStatistic statistic = new CoverageStatistic(t);
-
-        public CoverageStatistic getStatistic() {
-            return statistic;
-        }
-    }
+    public static final Dependency<IntegerList> T = Dependency.newDependency(IntegerList.class);
+    public static final Dependency<BooleanAssignmentList> EXCLUDE_INTERACTIONS =
+            Dependency.newDependency(BooleanAssignmentList.class);
+    public static final Dependency<BooleanAssignmentList> COMBINATION_SETS =
+            Dependency.newDependency(BooleanAssignmentList.class);
 
     public ATWiseCoverageComputation(IComputation<BooleanAssignmentList> sample, IComputation<?>... computations) {
         super(
                 sample,
-                Computations.of(2), //
-                Computations.of(new BooleanAssignment()),
+                Computations.of(new IntegerList(2)), //
+                Computations.of(new BooleanAssignmentList((VariableMap) null)),
+                Computations.of(new BooleanAssignmentList((VariableMap) null)),
                 computations);
     }
 
@@ -67,42 +69,144 @@ public abstract class ATWiseCoverageComputation extends AComputation<CoverageSta
         super(other);
     }
 
-    protected ArrayList<Environment> statisticList = new ArrayList<>();
+    protected ArrayList<CoverageStatistic> statisticList = new ArrayList<>();
+    protected BooleanAssignmentList combinationSetList;
+    protected IntegerList tValues;
+    protected SampleListIndex interactionFilter;
     protected BooleanAssignmentList sample;
-    protected int t, size;
 
-    protected SampleBitIndex sampleIndex;
-    protected int[] literals;
-    protected int[] gray;
+    protected final void init(List<Object> dependencyList) {
+        initWithOriginalVariableMap(dependencyList);
+
+        VariableMap referenceVariableMap = getReferenceVariableMap();
+        VariableMap sampleVariableMap = sample.getVariableMap();
+
+        if (combinationSetList.isEmpty()) {
+            combinationSetList.adapt(referenceVariableMap);
+            combinationSetList.add(referenceVariableMap.getVariables());
+        }
+
+        if (!Objects.equals(referenceVariableMap, sampleVariableMap)) {
+            FeatJAR.log().warning("Variable maps of given sample and reference are different.");
+            VariableMap mergedVariableMap = VariableMap.merge(sampleVariableMap, referenceVariableMap);
+            adaptToMergedVariableMap(mergedVariableMap);
+        }
+
+        initWithAdaptedVariableMap(dependencyList);
+    }
+
+    protected void initWithOriginalVariableMap(List<Object> dependencyList) {
+        sample = SAMPLE.get(dependencyList).toSolutionList();
+        combinationSetList = COMBINATION_SETS.get(dependencyList);
+    }
+
+    protected void initWithAdaptedVariableMap(List<Object> dependencyList) {
+        final int numberOfCombinationSets = combinationSetList.size();
+
+        tValues = T.get(dependencyList);
+        if (tValues.size() < 1) {
+            throw new IllegalArgumentException("List of t values must contain at least one value. Was empty.");
+        }
+        if (tValues.size() > 1) {
+            if (tValues.size() != numberOfCombinationSets) {
+                throw new IllegalArgumentException(String.format(
+                        "Number of t values (%d) must be one or equal to number of combinations sets (%d).",
+                        tValues.size(), combinationSetList.size()));
+            }
+        } else {
+            int t = tValues.get(0);
+            for (int i = 1; i < numberOfCombinationSets; i++) {
+                tValues.addAll(t);
+            }
+        }
+
+        for (int i = 0; i < numberOfCombinationSets; i++) {
+            int t = tValues.get(i);
+            if (t < 1) {
+                throw new IllegalArgumentException(
+                        String.format("Value for t must be greater than 0. Value was %d.", +t));
+            }
+            BooleanAssignment variables = combinationSetList.get(i);
+            if (variables.size() < t) {
+                throw new IllegalArgumentException(String.format(
+                        "Value for t (%d) must be greater than number of variables (%d).", t, variables.size()));
+            }
+            for (int v : variables.get()) {
+                if (v <= 0) {
+                    throw new IllegalArgumentException(
+                            String.format("Variable ID must not be negative or zero. Was %d", v));
+                }
+            }
+        }
+
+        interactionFilter = new SampleListIndex(
+                EXCLUDE_INTERACTIONS.get(dependencyList).getAll(),
+                sample.getVariableMap().getVariableCount());
+    }
+
+    protected void adaptToMergedVariableMap(VariableMap mergedVariableMap) {
+        combinationSetList.adapt(mergedVariableMap);
+        sample.adapt(mergedVariableMap);
+    }
+
+    protected VariableMap getReferenceVariableMap() {
+        return sample.getVariableMap();
+    }
 
     @Override
     public Result<CoverageStatistic> compute(List<Object> dependencyList, Progress progress) {
         init(dependencyList);
-        LexicographicIterator.parallelStream(t, literals.length, this::createStatistic)
-                .forEach(this::count);
+
+        SampleBitIndex sampleIndex =
+                new SampleBitIndex(sample.getAll(), sample.getVariableMap().getVariableCount());
+        final int numberOfCombinationSets = combinationSetList.size();
+        int count = 0;
+
+        for (int i = 0; i < numberOfCombinationSets; i++) {
+            int t = tValues.get(i);
+            count += (1 << t)
+                    * BinomialCalculator.computeBinomial(
+                            combinationSetList.get(i).size(), t);
+        }
+        progress.setTotalSteps(count);
+
+        for (int i = 0; i < numberOfCombinationSets; i++) {
+            int t = tValues.get(i);
+            final int[] grayCode = Ints.grayCode(t);
+            getCombinationStream(combinationSetList.get(i), t).forEach(c -> {
+                final CoverageStatistic statistic = c.environment();
+                final int[] interaction = c.select();
+                for (int g : grayCode) {
+                    checkCancel();
+                    progress.incrementCurrentStep();
+                    if (interactionFilter.test(interaction)) {
+                        statistic.incNumberOfIgnoredConditions();
+                    } else {
+                        if (sampleIndex.test(interaction)) {
+                            statistic.incNumberOfCoveredConditions();
+                        } else {
+                            countUncovered(interaction, statistic);
+                        }
+                    }
+                    interaction[g] = -interaction[g];
+                }
+            });
+        }
         return Result.ofOptional(statisticList.stream() //
-                .map(Environment::getStatistic) //
                 .reduce((s1, s2) -> s1.merge(s2)));
     }
 
-    protected void init(List<Object> dependencyList) {
-        sample = SAMPLE.get(dependencyList).toSolutionList();
-        t = T.get(dependencyList);
-        size = sample.getVariableMap().getVariableCount();
-
-        sampleIndex = new SampleBitIndex(sample.getAll(), size);
-
-        literals = Ints.filteredList(size, FILTER.get(dependencyList));
-        gray = Ints.grayCode(t);
-    }
-
-    protected abstract void count(Combination<Environment> combo);
-
-    private Environment createStatistic() {
-        Environment env = new Environment();
+    protected CoverageStatistic createStatistic() {
+        CoverageStatistic env = new CoverageStatistic();
         synchronized (statisticList) {
             statisticList.add(env);
         }
         return env;
     }
+
+    protected Stream<ICombination<CoverageStatistic, int[]>> getCombinationStream(BooleanAssignment variables, int t) {
+        return SingleLexicographicIterator.parallelStream(variables.get(), t, this::createStatistic);
+    }
+
+    protected abstract void countUncovered(int[] uncoveredInteraction, CoverageStatistic statistic);
 }

@@ -20,17 +20,19 @@
  */
 package de.featjar.analysis.sat4j.computation;
 
-import de.featjar.analysis.sat4j.computation.TWiseCombinations.TWiseCombinationsList;
 import de.featjar.analysis.sat4j.solver.ISelectionStrategy;
 import de.featjar.analysis.sat4j.solver.ModalImplicationGraph;
 import de.featjar.analysis.sat4j.solver.SAT4JSolutionSolver;
 import de.featjar.analysis.sat4j.solver.SAT4JSolver;
+import de.featjar.analysis.sat4j.twise.SampleListIndex;
 import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.Dependency;
 import de.featjar.base.computation.IComputation;
 import de.featjar.base.computation.Progress;
+import de.featjar.base.data.IntegerList;
 import de.featjar.base.data.Result;
 import de.featjar.formula.VariableMap;
+import de.featjar.formula.assignment.BooleanAssignment;
 import de.featjar.formula.assignment.BooleanAssignmentList;
 import java.util.List;
 import java.util.Random;
@@ -43,10 +45,13 @@ import java.util.Random;
  */
 public abstract class ATWiseSampleComputation extends ASAT4JAnalysis<BooleanAssignmentList> {
 
-    public static final Dependency<TWiseCombinationsList> COMBINATION_SPECS =
-            Dependency.newDependency(TWiseCombinationsList.class);
+    public static final Dependency<BooleanAssignmentList> COMBINATION_SETS =
+            Dependency.newDependency(BooleanAssignmentList.class);
 
-    public static final Dependency<Integer> T = Dependency.newDependency(Integer.class);
+    public static final Dependency<IntegerList> T = Dependency.newDependency(IntegerList.class);
+
+    public static final Dependency<BooleanAssignmentList> EXCLUDE_INTERACTIONS =
+            Dependency.newDependency(BooleanAssignmentList.class);
 
     public static final Dependency<Integer> CONFIGURATION_LIMIT = Dependency.newDependency(Integer.class);
     public static final Dependency<BooleanAssignmentList> INITIAL_SAMPLE =
@@ -58,13 +63,12 @@ public abstract class ATWiseSampleComputation extends ASAT4JAnalysis<BooleanAssi
     public static final Dependency<Boolean> INITIAL_SAMPLE_COUNTS_TOWARDS_CONFIGURATION_LIMIT =
             Dependency.newDependency(Boolean.class);
 
-    public static final int DEFAULT_T = 1;
-
     public ATWiseSampleComputation(IComputation<BooleanAssignmentList> clauseList, Object... computations) {
         super(
                 clauseList,
-                Computations.of(new TWiseCombinationsList()),
-                Computations.of(DEFAULT_T),
+                Computations.of(new BooleanAssignmentList((VariableMap) null)),
+                Computations.of(new IntegerList(1)),
+                Computations.of(new BooleanAssignmentList((VariableMap) null)),
                 Computations.of(Integer.MAX_VALUE),
                 Computations.of(new BooleanAssignmentList((VariableMap) null)),
                 new MIGBuilder(clauseList),
@@ -77,9 +81,11 @@ public abstract class ATWiseSampleComputation extends ASAT4JAnalysis<BooleanAssi
         super(other);
     }
 
-    protected int maxT, maxSampleSize, variableCount;
+    protected int maxSampleSize, variableCount;
     protected boolean allowChangeToInitialSample, initialSampleCountsTowardsConfigurationLimit;
-    protected TWiseCombinationsList combinationsList;
+    protected BooleanAssignmentList combinationSetList;
+    protected IntegerList tValues;
+    protected SampleListIndex interactionFilter;
 
     protected SAT4JSolutionSolver solver;
     protected VariableMap variableMap;
@@ -91,12 +97,6 @@ public abstract class ATWiseSampleComputation extends ASAT4JAnalysis<BooleanAssi
 
     @Override
     public final Result<BooleanAssignmentList> compute(List<Object> dependencyList, Progress progress) {
-        combinationsList = COMBINATION_SPECS.get(dependencyList);
-        maxT = combinationsList.stream().mapToInt(TWiseCombinations::getT).max().orElse(T.get(dependencyList));
-        if (maxT < 1) {
-            throw new IllegalArgumentException("Value for t must be grater than 0. Value was " + maxT);
-        }
-
         maxSampleSize = CONFIGURATION_LIMIT.get(dependencyList);
         if (maxSampleSize < 0) {
             throw new IllegalArgumentException(
@@ -113,9 +113,54 @@ public abstract class ATWiseSampleComputation extends ASAT4JAnalysis<BooleanAssi
 
         variableMap = BOOLEAN_CLAUSE_LIST.get(dependencyList).getVariableMap();
         variableCount = variableMap.getVariableCount();
-        maxT = Math.min(maxT, Math.max(variableCount, 1));
 
-        solver = initializeSolver(dependencyList);
+        combinationSetList = COMBINATION_SETS.get(dependencyList);
+        if (combinationSetList.isEmpty()) {
+            combinationSetList.adapt(variableMap);
+            combinationSetList.add(variableMap.getVariables());
+        }
+        int numberOfCombinationSets = combinationSetList.size();
+
+        interactionFilter =
+                new SampleListIndex(EXCLUDE_INTERACTIONS.get(dependencyList).getAll(), variableCount);
+
+        tValues = T.get(dependencyList);
+        if (tValues.size() < 1) {
+            throw new IllegalArgumentException("List of t values must contain at least one value. Was empty.");
+        }
+        if (tValues.size() > 1) {
+            if (tValues.size() != numberOfCombinationSets) {
+                throw new IllegalArgumentException(String.format(
+                        "Number of t values (%d) must be one or equal to number of combinations sets (%d).",
+                        tValues.size(), combinationSetList.size()));
+            }
+        } else {
+            int t = tValues.get(0);
+            for (int i = 1; i < numberOfCombinationSets; i++) {
+                tValues.addAll(t);
+            }
+        }
+
+        for (int i = 0; i < numberOfCombinationSets; i++) {
+            int t = tValues.get(i);
+            if (t < 1) {
+                throw new IllegalArgumentException(
+                        String.format("Value for t must be greater than 0. Value was %d.", +t));
+            }
+            BooleanAssignment variables = combinationSetList.get(i);
+            if (variables.size() < t) {
+                throw new IllegalArgumentException(String.format(
+                        "Value for t (%d) must be greater than number of variables (%d).", t, variables.size()));
+            }
+            for (int v : variables.get()) {
+                if (v <= 0) {
+                    throw new IllegalArgumentException(
+                            String.format("Variable ID must not be negative or zero. Was %d", v));
+                }
+            }
+        }
+
+        solver = createSolver(dependencyList);
         solver.setSelectionStrategy(ISelectionStrategy.random(random));
 
         if (initialSampleCountsTowardsConfigurationLimit) {

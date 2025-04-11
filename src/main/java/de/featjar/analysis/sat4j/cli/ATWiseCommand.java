@@ -20,11 +20,11 @@
  */
 package de.featjar.analysis.sat4j.cli;
 
-import de.featjar.base.FeatJAR;
+import de.featjar.analysis.sat4j.computation.ATWiseSampleComputation;
 import de.featjar.base.cli.Option;
 import de.featjar.base.cli.OptionList;
-import de.featjar.base.computation.Dependency;
 import de.featjar.base.computation.IComputation;
+import de.featjar.base.data.IntegerList;
 import de.featjar.base.data.Result;
 import de.featjar.base.io.IO;
 import de.featjar.base.io.format.IFormat;
@@ -34,6 +34,7 @@ import de.featjar.formula.assignment.BooleanAssignmentList;
 import de.featjar.formula.io.BooleanAssignmentGroupsFormats;
 import de.featjar.formula.io.csv.BooleanSolutionListCSVFormat;
 import java.nio.file.Path;
+import java.util.List;
 
 /**
  * Computes solutions for a given formula using SAT4J.
@@ -52,9 +53,21 @@ public abstract class ATWiseCommand extends ASAT4JAnalysisCommand<BooleanAssignm
     /**
      * Value of t.
      */
-    public static final Option<Integer> T_OPTION = Option.newOption("t", Option.IntegerParser) //
-            .setDescription("Value of parameter t.") //
-            .setDefaultValue(2);
+    public static final Option<List<Integer>> T_OPTION = Option.newListOption("t", Option.IntegerParser) //
+            .setDescription("Value(s) of parameter t.") //
+            .setDefaultValue(List.of(2));
+
+    /**
+     * Path option for combination sets.
+     */
+    public static final Option<Path> COMBINATION_SETS = Option.newOption("combination-sets", Option.PathParser)
+            .setRequired(false)
+            .setDefaultValue(null)
+            .setDescription("Path to combination specification files.");
+
+    public static final Option<Path> INGNORE_INTERACTIONS = Option.newOption("ignore-interactions", Option.PathParser)
+            .setDescription("Path to list of interactions that will be ignored.")
+            .setValidator(Option.PathValidator);
 
     /**
      * Path option for initial sample.
@@ -72,24 +85,53 @@ public abstract class ATWiseCommand extends ASAT4JAnalysisCommand<BooleanAssignm
                     "initial-sample-limit")
             .setDescription("If set, the initial sample counts towards the global configuration limit.");
 
-    // TODO handle other combination specs
+    @Override
+    public IComputation<BooleanAssignmentList> newAnalysis(
+            OptionList optionParser, IComputation<BooleanAssignmentList> formula) {
+        IComputation<BooleanAssignmentList> analysis = newTWiseAnalysis(optionParser, formula)
+                .set(ATWiseSampleComputation.T, new IntegerList(optionParser.get(T_OPTION)))
+                .set(ATWiseSampleComputation.CONFIGURATION_LIMIT, optionParser.get(LIMIT_OPTION))
+                .set(
+                        ATWiseSampleComputation.INITIAL_SAMPLE_COUNTS_TOWARDS_CONFIGURATION_LIMIT,
+                        optionParser.get(INITIAL_SAMPLE_COUNTS_TOWARDS_CONFIGURATION_LIMIT))
+                .set(ATWiseSampleComputation.RANDOM_SEED, optionParser.get(RANDOM_SEED_OPTION))
+                .set(ATWiseSampleComputation.SAT_TIMEOUT, optionParser.get(SAT_TIMEOUT_OPTION));
 
-    protected IComputation<BooleanAssignmentList> setInitialSample(
-            OptionList optionParser,
-            IComputation<BooleanAssignmentList> analysis,
-            Dependency<BooleanAssignmentList> dependency) {
         Result<Path> initialSamplePath = optionParser.getResult(INITIAL_SAMPLE_OPTION);
         if (initialSamplePath.isPresent()) {
-            Result<BooleanAssignmentGroups> initialSample =
-                    IO.load(initialSamplePath.get(), BooleanAssignmentGroupsFormats.getInstance());
-            if (initialSample.isPresent()) {
-                return analysis.set(dependency, initialSample.get().getFirstGroup());
-            } else {
-                FeatJAR.log().problems(initialSample.getProblems(), Verbosity.WARNING);
+            BooleanAssignmentGroups initialSample = IO.load(
+                            initialSamplePath.get(), BooleanAssignmentGroupsFormats.getInstance())
+                    .orElseLog(Verbosity.WARNING);
+            if (initialSample != null) {
+                analysis.set(ATWiseSampleComputation.INITIAL_SAMPLE, initialSample.getFirstGroup());
             }
         }
+
+        Result<Path> combinationSpecsPath = optionParser.getResult(COMBINATION_SETS);
+        if (combinationSpecsPath.isPresent()) {
+            BooleanAssignmentGroups tWiseCombinationsList = IO.load(
+                            combinationSpecsPath.get(), new BooleanAssignmentGroupsFormats())
+                    .orElseLog(Verbosity.WARNING);
+            if (tWiseCombinationsList != null) {
+                analysis.set(ATWiseSampleComputation.COMBINATION_SETS, tWiseCombinationsList.getMergedGroups());
+            }
+        }
+
+        Result<Path> ignoreInteractionsPath = optionParser.getResult(INGNORE_INTERACTIONS);
+        if (ignoreInteractionsPath.isPresent()) {
+            BooleanAssignmentGroups ignoreInteractions = IO.load(
+                            ignoreInteractionsPath.get(), new BooleanAssignmentGroupsFormats())
+                    .orElseLog(Verbosity.WARNING);
+            if (ignoreInteractions != null) {
+                analysis.set(ATWiseSampleComputation.EXCLUDE_INTERACTIONS, ignoreInteractions.getMergedGroups());
+            }
+        }
+
         return analysis;
     }
+
+    protected abstract IComputation<BooleanAssignmentList> newTWiseAnalysis(
+            OptionList optionParser, IComputation<BooleanAssignmentList> formula);
 
     @Override
     protected Object getOuputObject(BooleanAssignmentList list) {

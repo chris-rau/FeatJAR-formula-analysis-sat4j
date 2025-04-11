@@ -49,6 +49,23 @@ public abstract class SAT4JSolver implements de.featjar.analysis.ISolver {
     protected boolean isTimeoutOccurred;
     protected boolean trivialContradictionFound;
 
+    public static void initializeSolver(
+            SAT4JSolver solver,
+            BooleanAssignmentList clauseList,
+            BooleanAssignment assumedAssignment,
+            BooleanAssignmentList assumedClauseList,
+            Duration timeout) {
+        FeatJAR.log().debug("initializing SAT4J");
+        FeatJAR.log().debug("variables %s", clauseList.getVariableMap());
+        FeatJAR.log().debug("clauses %s", clauseList);
+        FeatJAR.log().debug("assuming %s", assumedAssignment);
+        FeatJAR.log().debug("assuming %s", assumedClauseList);
+        solver.getClauseList().addAll(assumedClauseList);
+        solver.getAssignment().addAll(assumedAssignment);
+        solver.setTimeout(timeout);
+        solver.setGlobalTimeout(true);
+    }
+
     /**
      * Replaces all values in {@code model} that are different in {@code otherModel}
      * with zero. Does not modify {@code otherModel}. Assumes that {@code model} and

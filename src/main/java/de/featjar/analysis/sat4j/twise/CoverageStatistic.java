@@ -26,14 +26,10 @@ package de.featjar.analysis.sat4j.twise;
  * @author Sebastian Krieter
  */
 public class CoverageStatistic {
-    private final int t;
     private long numberOfInvalidConditions;
     private long numberOfCoveredConditions;
     private long numberOfUncoveredConditions;
-
-    public CoverageStatistic(int t) {
-        this.t = t;
-    }
+    private long numberOfIgnoredConditions;
 
     public void setNumberOfInvalidConditions(long numberOfInvalidConditions) {
         this.numberOfInvalidConditions = numberOfInvalidConditions;
@@ -45,6 +41,10 @@ public class CoverageStatistic {
 
     public void setNumberOfUncoveredConditions(long numberOfUncoveredConditions) {
         this.numberOfUncoveredConditions = numberOfUncoveredConditions;
+    }
+
+    public void setNumberOfIgnoredConditions(long numberOfIgnoredConditions) {
+        this.numberOfIgnoredConditions = numberOfIgnoredConditions;
     }
 
     public void incNumberOfInvalidConditions() {
@@ -59,8 +59,15 @@ public class CoverageStatistic {
         numberOfUncoveredConditions++;
     }
 
+    public void incNumberOfIgnoredConditions() {
+        numberOfIgnoredConditions++;
+    }
+
     public long total() {
-        return numberOfInvalidConditions + numberOfCoveredConditions + numberOfUncoveredConditions;
+        return numberOfInvalidConditions
+                + numberOfCoveredConditions
+                + numberOfUncoveredConditions
+                + numberOfIgnoredConditions;
     }
 
     public long valid() {
@@ -79,6 +86,10 @@ public class CoverageStatistic {
         return numberOfUncoveredConditions;
     }
 
+    public long ignored() {
+        return numberOfIgnoredConditions;
+    }
+
     public double coverage() {
         return (numberOfCoveredConditions + numberOfUncoveredConditions != 0)
                 ? (double) numberOfCoveredConditions / (numberOfCoveredConditions + numberOfUncoveredConditions)
@@ -89,6 +100,7 @@ public class CoverageStatistic {
         numberOfInvalidConditions += other.numberOfInvalidConditions;
         numberOfCoveredConditions += other.numberOfCoveredConditions;
         numberOfUncoveredConditions += other.numberOfUncoveredConditions;
+        numberOfIgnoredConditions += other.numberOfIgnoredConditions;
         return this;
     }
 
@@ -98,8 +110,7 @@ public class CoverageStatistic {
         String format = "%" + digits + "d";
 
         StringBuilder sb = new StringBuilder();
-        sb.append(t);
-        sb.append("-Wise Interaction Coverage Statistics");
+        sb.append("Interaction Coverage Statistics");
         sb.append("\nCoverage:     ");
         sb.append(coverage());
         sb.append("\nInteractions: ");
@@ -115,10 +126,15 @@ public class CoverageStatistic {
         sb.append("Uncovered: ");
         sb.append(String.format(format, numberOfUncoveredConditions));
         sb.append("\n ");
+        sb.append(Character.toChars(0x251c));
+        sb.append(Character.toChars(0x2500));
+        sb.append("Ignored:   ");
+        sb.append(String.format(format, numberOfInvalidConditions));
+        sb.append("\n ");
         sb.append(Character.toChars(0x2514));
         sb.append(Character.toChars(0x2500));
         sb.append("Invalid:   ");
-        sb.append(String.format(format, numberOfInvalidConditions));
+        sb.append(String.format(format, numberOfIgnoredConditions));
         return sb.toString();
     }
 }

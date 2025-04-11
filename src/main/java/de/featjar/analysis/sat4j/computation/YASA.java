@@ -32,8 +32,10 @@ import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.Dependency;
 import de.featjar.base.computation.IComputation;
 import de.featjar.base.computation.Progress;
+import de.featjar.base.data.BinomialCalculator;
 import de.featjar.base.data.Ints;
 import de.featjar.base.data.Result;
+import de.featjar.base.data.SingleLexicographicIterator;
 import de.featjar.formula.assignment.BooleanAssignment;
 import de.featjar.formula.assignment.BooleanAssignmentList;
 import de.featjar.formula.assignment.BooleanSolution;
@@ -114,27 +116,18 @@ public class YASA extends ATWiseSampleComputation {
 
         selectionCandidates = new ArrayList<>();
 
-        if (combinationsList.isEmpty()) {
-            combinationsList.add(new TWiseCombinations(
-                    new BooleanAssignment(variableMap
-                            .getVariables()
-                            .removeAllVariables(
-                                    Arrays.stream(mig.getCore()).map(Math::abs).toArray())),
-                    maxT));
-        }
-
+        final int numberOfCombinationSets = combinationSetList.size();
         int count = 0;
-        for (TWiseCombinations combinations : combinationsList) {
-            count += (1 << maxT) * combinations.forOtherT(maxT).getTotalSteps();
-        }
-        for (TWiseCombinations combinations : combinationsList) {
-            int minT = incrementalT ? 1 : combinations.getT();
+
+        for (int i = 0; i < numberOfCombinationSets; i++) {
+            int maxT = tValues.get(i);
+            BooleanAssignment combinationSet = combinationSetList.get(i);
+            count += (1 << maxT) * BinomialCalculator.computeBinomial(combinationSet.size(), maxT);
+            int minT = incrementalT ? 1 : maxT;
             for (int t = minT; t <= maxT; t++) {
-                long factor = iterations * (1 << t);
-                count += factor * combinations.forOtherT(t).getTotalSteps();
+                count += iterations * (1 << t) * BinomialCalculator.computeBinomial(combinationSet.size(), t);
             }
         }
-
         progress.setTotalSteps(count);
 
         buildCombinations(progress);
@@ -176,21 +169,25 @@ public class YASA extends ATWiseSampleComputation {
             currentSampleIndex.addConfiguration(config);
         }
 
-        for (TWiseCombinations combinations : combinationsList) {
-            final int[] gray = Ints.grayCode(combinations.getT());
-            combinations.shuffle(random);
-            combinations.stream().forEach(combinationLiterals -> {
-                for (int g : gray) {
-                    checkCancel();
-                    monitor.incrementCurrentStep();
+        for (int i = 0; i < combinationSetList.size(); i++) {
+            int t = tValues.get(i);
+            final int[] gray = Ints.grayCode(t);
+            SingleLexicographicIterator.stream(
+                            combinationSetList.get(i).shuffle(random).get(), t)
+                    .forEach(combination -> {
+                        int[] combinationLiterals = combination.select();
+                        for (int g : gray) {
+                            checkCancel();
+                            monitor.incrementCurrentStep();
 
-                    if (!currentSampleIndex.test(combinationLiterals)
-                            && !isCombinationInvalidMIG(combinationLiterals)) {
-                        newRandomConfiguration(combinationLiterals);
-                    }
-                    combinationLiterals[g] = -combinationLiterals[g];
-                }
-            });
+                            if (!currentSampleIndex.test(combinationLiterals)
+                                    && !isCombinationInvalidMIG(combinationLiterals)
+                                    && !interactionFilter.test(combinationLiterals)) {
+                                newRandomConfiguration(combinationLiterals);
+                            }
+                            combinationLiterals[g] = -combinationLiterals[g];
+                        }
+                    });
         }
         setBestSolutionList();
     }
@@ -224,30 +221,33 @@ public class YASA extends ATWiseSampleComputation {
             for (BooleanAssignment config : initialSample) {
                 newConfiguration(config.get(), allowChangeToInitialSample);
             }
-            for (TWiseCombinations combinations : combinationsList) {
-                int minT = incrementalT ? 1 : combinations.getT();
-                int maxT = combinations.getT();
+
+            for (int i = 0; i < combinationSetList.size(); i++) {
+                int maxT = tValues.get(i);
+                int minT = incrementalT ? 1 : maxT;
                 for (int t = minT; t <= maxT; t++) {
                     final int[] gray = Ints.grayCode(t);
-                    combinations = combinations.forOtherT(t);
-                    combinations.shuffle(random);
-                    combinations.stream().forEach(combinationLiterals -> {
-                        for (int g : gray) {
-                            checkCancel();
-                            monitor.incrementCurrentStep();
-                            if (!currentSampleIndex.test(combinationLiterals)
-                                    && bestSampleIndex.test(combinationLiterals)) {
-                                getSelectionCandidates(combinationLiterals);
-                                if (selectionCandidates.isEmpty()
-                                        || (!tryCoverWithRandomSolutions(combinationLiterals)
-                                                && !tryCoverWithSat(combinationLiterals))) {
-                                    newConfiguration(combinationLiterals, true);
+                    SingleLexicographicIterator.stream(
+                                    combinationSetList.get(i).shuffle(random).get(), t)
+                            .forEach(combination -> {
+                                int[] combinationLiterals = combination.select();
+                                for (int g : gray) {
+                                    checkCancel();
+                                    monitor.incrementCurrentStep();
+                                    if (!currentSampleIndex.test(combinationLiterals)
+                                            && bestSampleIndex.test(combinationLiterals)
+                                            && !interactionFilter.test(combinationLiterals)) {
+                                        getSelectionCandidates(combinationLiterals);
+                                        if (selectionCandidates.isEmpty()
+                                                || (!tryCoverWithRandomSolutions(combinationLiterals)
+                                                        && !tryCoverWithSat(combinationLiterals))) {
+                                            newConfiguration(combinationLiterals, true);
+                                        }
+                                        selectionCandidates.clear();
+                                    }
+                                    combinationLiterals[g] = -combinationLiterals[g];
                                 }
-                                selectionCandidates.clear();
-                            }
-                            combinationLiterals[g] = -combinationLiterals[g];
-                        }
-                    });
+                            });
                 }
             }
             setBestSolutionList();
@@ -282,6 +282,7 @@ public class YASA extends ATWiseSampleComputation {
     }
 
     private boolean tryCoverWithRandomSolutions(int[] literals) {
+        // TODO use this set for AND
         BitSet literalBitSet = randomSampleIndex.getBitSet(literals);
         if (!literalBitSet.isEmpty()) {
             Collections.sort(

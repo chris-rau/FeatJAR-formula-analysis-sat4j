@@ -54,7 +54,7 @@ public class ComputeSolutionsSAT4J extends ASAT4JAnalysis.Solution<BooleanAssign
 
     @Override
     public Result<BooleanAssignmentList> compute(List<Object> dependencyList, Progress progress) {
-        SAT4JSolutionSolver solver = (SAT4JSolutionSolver) initializeSolver(dependencyList);
+        SAT4JSolutionSolver solver = (SAT4JSolutionSolver) createSolver(dependencyList);
         int limit = LIMIT.get(dependencyList);
         progress.setTotalSteps(limit);
         checkCancel();

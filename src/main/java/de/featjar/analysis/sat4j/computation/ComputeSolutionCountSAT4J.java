@@ -40,7 +40,7 @@ public class ComputeSolutionCountSAT4J extends ASAT4JAnalysis.Solution<BigIntege
 
     @Override
     public Result<BigInteger> compute(List<Object> dependencyList, Progress progress) {
-        SAT4JSolver solver = initializeSolver(dependencyList);
+        SAT4JSolver solver = createSolver(dependencyList);
         BigInteger solutionCount = BigInteger.ZERO;
         Result<Boolean> hasSolution = solver.hasSolution();
         while (hasSolution.equals(Result.of(true))) {

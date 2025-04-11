@@ -39,6 +39,6 @@ public class ComputeSolutionSAT4J extends ASAT4JAnalysis.Solution<BooleanSolutio
 
     @Override
     public Result<BooleanSolution> compute(List<Object> dependencyList, Progress progress) {
-        return initializeSolver(dependencyList).findSolution();
+        return createSolver(dependencyList).findSolution();
     }
 }

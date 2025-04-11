@@ -54,7 +54,7 @@ public class ComputeCoreSAT4J extends ASAT4JAnalysis.Solution<BooleanAssignment>
 
     @Override
     public Result<BooleanAssignment> compute(List<Object> dependencyList, Progress progress) {
-        SAT4JSolutionSolver solver = initializeSolver(dependencyList);
+        SAT4JSolutionSolver solver = createSolver(dependencyList);
         Random random = new Random(RANDOM_SEED.get(dependencyList));
         BooleanAssignment variablesOfInterest = VARIABLES_OF_INTEREST.get(dependencyList);
         VariableMap variableMap = BOOLEAN_CLAUSE_LIST.get(dependencyList).getVariableMap();

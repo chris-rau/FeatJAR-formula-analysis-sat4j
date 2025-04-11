@@ -21,7 +21,6 @@
 package de.featjar.analysis.sat4j.twise;
 
 import de.featjar.base.computation.IComputation;
-import de.featjar.base.data.Combination;
 import de.featjar.formula.assignment.BooleanAssignmentList;
 
 /**
@@ -41,15 +40,7 @@ public class AbsoluteTWiseCoverageComputation extends ATWiseCoverageComputation 
     }
 
     @Override
-    protected void count(Combination<Environment> combo) {
-        int[] select = combo.getSelection(literals);
-        for (int g : gray) {
-            if (sampleIndex.test(select)) {
-                combo.environment.statistic.incNumberOfCoveredConditions();
-            } else {
-                combo.environment.statistic.incNumberOfUncoveredConditions();
-            }
-            select[g] = -select[g];
-        }
+    protected void countUncovered(int[] uncoveredInteraction, CoverageStatistic statistic) {
+        statistic.incNumberOfUncoveredConditions();
     }
 }

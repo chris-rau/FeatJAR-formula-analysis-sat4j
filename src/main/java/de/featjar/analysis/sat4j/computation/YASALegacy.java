@@ -29,8 +29,10 @@ import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.Dependency;
 import de.featjar.base.computation.IComputation;
 import de.featjar.base.computation.Progress;
+import de.featjar.base.data.BinomialCalculator;
 import de.featjar.base.data.ExpandableIntegerList;
 import de.featjar.base.data.Result;
+import de.featjar.base.data.SingleLexicographicIterator;
 import de.featjar.formula.assignment.BooleanAssignment;
 import de.featjar.formula.assignment.BooleanAssignmentList;
 import de.featjar.formula.assignment.BooleanClause;
@@ -41,7 +43,6 @@ import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.IntStream;
 
 /**
  * YASA sampling algorithm. Generates configurations for a given propositional
@@ -158,7 +159,8 @@ public class YASALegacy extends ATWiseSampleComputation {
         }
     }
 
-    private int iterations, internalConfigurationLimit;
+    private int iterations, internalConfigurationLimit, t;
+    private BooleanAssignment literals;
 
     private ArrayDeque<BooleanSolution> randomSample;
     private List<PartialConfiguration> bestSample;
@@ -192,15 +194,14 @@ public class YASALegacy extends ATWiseSampleComputation {
 
         mig = MIG.get(dependencyList);
 
-        combinationsList.add(new TWiseCombinations(
-                new BooleanAssignment(new BooleanAssignment(IntStream.range(-variableCount, variableCount + 1)
-                                .filter(i -> i != 0)
-                                .toArray())
-                        .removeAllVariables(
-                                Arrays.stream(mig.getCore()).map(Math::abs).toArray())),
-                maxT));
+        t = tValues.get(0);
+        BooleanAssignment variables = new BooleanAssignment(combinationSetList
+                .get(0)
+                .removeAllVariables(Arrays.stream(mig.getCore()).map(Math::abs).toArray()));
+        int[] addAll = variables.addAll(variables.negate());
+        literals = new BooleanAssignment(addAll);
 
-        progress.setTotalSteps(iterations * combinationsList.get(0).getTotalSteps());
+        progress.setTotalSteps(iterations * BinomialCalculator.computeBinomial(literals.size(), t));
 
         buildCombinations(progress);
 
@@ -231,11 +232,11 @@ public class YASALegacy extends ATWiseSampleComputation {
     private void buildCombinations(Progress monitor) {
         initSample();
 
-        int t = maxT;
         selectedSampleIndices = new ExpandableIntegerList[t];
         initRun();
 
-        combinationsList.get(0).stream().forEach(combinationLiterals -> {
+        SingleLexicographicIterator.stream(literals.get(), t).forEach(combination -> {
+            int[] combinationLiterals = combination.select();
             checkCancel();
             monitor.incrementCurrentStep();
 
@@ -294,31 +295,32 @@ public class YASALegacy extends ATWiseSampleComputation {
 
         for (int j = 1; j < iterations; j++) {
             checkCancel();
-            combinationsList.get(0).shuffle(random);
             initSample();
             initRun();
-            combinationsList.get(0).stream().forEach(combinationLiterals -> {
-                checkCancel();
-                monitor.incrementCurrentStep();
-                if (isCovered(combinationLiterals, currentSampleIndices)) {
-                    return;
-                }
-                if (!isCovered(combinationLiterals, bestSampleIndices)) {
-                    return;
-                }
-                try {
-                    if (tryCoverWithoutMIG(combinationLiterals)) {
-                        return;
-                    }
-                    if (tryCoverWithSat(combinationLiterals)) {
-                        return;
-                    }
-                    newConfiguration(combinationLiterals);
-                } finally {
-                    candidateConfiguration.clear();
-                    newConfiguration = null;
-                }
-            });
+            SingleLexicographicIterator.stream(literals.shuffle(random).get(), t)
+                    .forEach(combination -> {
+                        int[] combinationLiterals = combination.select();
+                        checkCancel();
+                        monitor.incrementCurrentStep();
+                        if (isCovered(combinationLiterals, currentSampleIndices)) {
+                            return;
+                        }
+                        if (!isCovered(combinationLiterals, bestSampleIndices)) {
+                            return;
+                        }
+                        try {
+                            if (tryCoverWithoutMIG(combinationLiterals)) {
+                                return;
+                            }
+                            if (tryCoverWithSat(combinationLiterals)) {
+                                return;
+                            }
+                            newConfiguration(combinationLiterals);
+                        } finally {
+                            candidateConfiguration.clear();
+                            newConfiguration = null;
+                        }
+                    });
             setBestSolutionList();
         }
     }
@@ -366,15 +368,15 @@ public class YASALegacy extends ATWiseSampleComputation {
         Collections.sort(currentSample, (a, b) -> b.countLiterals() - a.countLiterals());
     }
 
-    private boolean isCovered(int[] literals, ArrayList<ExpandableIntegerList> indexedSolutions) {
-        if (maxT < 2) {
+    private boolean isCovered(int[] combinationLiterals, ArrayList<ExpandableIntegerList> indexedSolutions) {
+        if (t < 2) {
             return !indexedSolutions
-                    .get(ModalImplicationGraph.getVertexIndex(literals[0]))
+                    .get(ModalImplicationGraph.getVertexIndex(combinationLiterals[0]))
                     .isEmpty();
         }
-        for (int i = 0; i < maxT; i++) {
+        for (int i = 0; i < t; i++) {
             final ExpandableIntegerList indexedSolution =
-                    indexedSolutions.get(ModalImplicationGraph.getVertexIndex(literals[i]));
+                    indexedSolutions.get(ModalImplicationGraph.getVertexIndex(combinationLiterals[i]));
             if (indexedSolution.size() == 0) {
                 return false;
             }
@@ -388,7 +390,7 @@ public class YASALegacy extends ATWiseSampleComputation {
         loop:
         for (int i = 0; i < i0.size(); i++) {
             int id0 = ia0[i];
-            for (int j = 1; j < maxT; j++) {
+            for (int j = 1; j < t; j++) {
                 final ExpandableIntegerList i1 = selectedSampleIndices[j];
                 int binarySearch = Arrays.binarySearch(i1.getInternalArray(), ix[j - 1], i1.size(), id0);
                 if (binarySearch < 0) {
@@ -413,16 +415,17 @@ public class YASALegacy extends ATWiseSampleComputation {
         return bitSet;
     }
 
-    private boolean isCovered(int[] literals, BitSet[] indexedSolutions) {
-        if (maxT == 1) {
-            return !indexedSolutions[literals[0] + variableCount].isEmpty();
+    private boolean isCovered(int[] combinationLiterals, BitSet[] indexedSolutions) {
+        if (t == 1) {
+            return !indexedSolutions[combinationLiterals[0] + variableCount].isEmpty();
         }
 
-        return !combinedIndex(variableCount, literals, indexedSolutions).isEmpty();
+        return !combinedIndex(variableCount, combinationLiterals, indexedSolutions)
+                .isEmpty();
     }
 
-    private void select(PartialConfiguration solution, int[] literals) {
-        final int lastIndex = solution.setLiteral(literals);
+    private void select(PartialConfiguration solution, int[] combinationLiterals) {
+        final int lastIndex = solution.setLiteral(combinationLiterals);
         for (int i = lastIndex; i < solution.visitor.getAddedLiteralCount(); i++) {
             ExpandableIntegerList indexList = currentSampleIndices.get(
                     ModalImplicationGraph.getVertexIndex(solution.visitor.getAddedLiterals()[i]));
@@ -460,7 +463,7 @@ public class YASALegacy extends ATWiseSampleComputation {
         return false;
     }
 
-    private boolean tryCoverWithMIG(int[] literals) {
+    private boolean tryCoverWithMIG(int[] combinationLiterals) {
         configLoop:
         for (final PartialConfiguration configuration : currentSample) {
             if (configuration.allowChange && !configuration.isComplete()) {
@@ -471,8 +474,8 @@ public class YASALegacy extends ATWiseSampleComputation {
                         continue configLoop;
                     }
                 }
-                if (isSelectionPossibleSol(configuration, literals)) {
-                    select(configuration, literals);
+                if (isSelectionPossibleSol(configuration, combinationLiterals)) {
+                    select(configuration, combinationLiterals);
                     change(configuration);
                     return true;
                 }
@@ -585,9 +588,9 @@ public class YASALegacy extends ATWiseSampleComputation {
         }
     }
 
-    private boolean tryCoverWithSat(int[] literals) {
+    private boolean tryCoverWithSat(int[] combinationLiterals) {
         for (PartialConfiguration configuration : candidateConfiguration) {
-            if (trySelectSat(configuration, literals)) {
+            if (trySelectSat(configuration, combinationLiterals)) {
                 change(configuration);
                 return true;
             }
@@ -652,10 +655,10 @@ public class YASALegacy extends ATWiseSampleComputation {
         return false;
     }
 
-    private boolean trySelectSat(PartialConfiguration configuration, final int[] literals) {
+    private boolean trySelectSat(PartialConfiguration configuration, final int[] combinationLiterals) {
         final int oldModelCount = configuration.visitor.getAddedLiteralCount();
         try {
-            configuration.visitor.propagate(literals);
+            configuration.visitor.propagate(combinationLiterals);
         } catch (RuntimeException e) {
             configuration.visitor.reset(oldModelCount);
             return false;
@@ -671,8 +674,8 @@ public class YASALegacy extends ATWiseSampleComputation {
                     }
                 }
             } else {
-                for (int i = 0; i < literals.length; i++) {
-                    int l = literals[i];
+                for (int i = 0; i < combinationLiterals.length; i++) {
+                    int l = combinationLiterals[i];
                     if (configuration.get()[Math.abs(l) - 1] == 0) {
                         solver.getAssignment().add(l);
                     }

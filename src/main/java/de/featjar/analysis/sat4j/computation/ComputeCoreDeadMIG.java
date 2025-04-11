@@ -59,7 +59,7 @@ public class ComputeCoreDeadMIG extends ASAT4JAnalysis.Solution<BooleanAssignmen
 
     @Override
     public Result<BooleanAssignment> compute(List<Object> dependencyList, Progress progress) {
-        SAT4JSolutionSolver solver = initializeSolver(dependencyList);
+        SAT4JSolutionSolver solver = createSolver(dependencyList);
         Random random = new Random(RANDOM_SEED.get(dependencyList));
         BooleanAssignmentList clauseList = BOOLEAN_CLAUSE_LIST.get(dependencyList);
         BooleanAssignment assignment = ASSUMED_ASSIGNMENT.get(dependencyList);

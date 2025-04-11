@@ -32,7 +32,7 @@ public class SAT4JCommandsTest {
     @Test
     void testProjectionCommand() throws IOException {
         Path tempFile = Files.createTempFile("featJarTest", ".txt");
-        int exitCode = FeatJAR.run(
+        int exitCode = FeatJAR.runTest(
                 "projection-sat4j",
                 "--input",
                 "../formula/src/testFixtures/resources/GPL/model.xml",
@@ -50,7 +50,7 @@ public class SAT4JCommandsTest {
     @Test
     void testProjectionCommand2() throws IOException {
         Path tempFile = Files.createTempFile("featJarTest", ".txt");
-        int exitCode = FeatJAR.run(
+        int exitCode = FeatJAR.runTest(
                 "projection-sat4j",
                 "--input",
                 "../formula/src/testFixtures/resources/GPL/model.xml",
@@ -74,7 +74,7 @@ public class SAT4JCommandsTest {
     @Test
     void testProjectionCommand3() throws IOException {
         Path tempFile = Files.createTempFile("featJarTest", ".txt");
-        int exitCode = FeatJAR.run(
+        int exitCode = FeatJAR.runTest(
                 "projection-sat4j",
                 "--input",
                 "../formula/src/testFixtures/resources/GPL/model.xml",
@@ -100,10 +100,10 @@ public class SAT4JCommandsTest {
 
     @Test
     void testCoreCommand() throws IOException {
-        int exitCode = FeatJAR.run("core-sat4j", "--input", "../formula/src/testFixtures/resources/GPL/model.xml");
+        int exitCode = FeatJAR.runTest("core-sat4j", "--input", "../formula/src/testFixtures/resources/GPL/model.xml");
         Assertions.assertEquals(0, exitCode);
 
-        exitCode = FeatJAR.run(
+        exitCode = FeatJAR.runTest(
                 "core-sat4j",
                 "--input",
                 "../formula/src/testFixtures/resources/GPL/model.xml",
@@ -121,10 +121,10 @@ public class SAT4JCommandsTest {
     @Test
     void testAtomicSetsCommand() throws IOException {
         int exitCode =
-                FeatJAR.run("atomic-sets-sat4j", "--input", "../formula/src/testFixtures/resources/GPL/model.xml");
+                FeatJAR.runTest("atomic-sets-sat4j", "--input", "../formula/src/testFixtures/resources/GPL/model.xml");
         Assertions.assertEquals(0, exitCode);
 
-        exitCode = FeatJAR.run(
+        exitCode = FeatJAR.runTest(
                 "atomic-sets-sat4j",
                 "--input",
                 "../formula/src/testFixtures/resources/GPL/model.xml",
@@ -141,10 +141,10 @@ public class SAT4JCommandsTest {
 
     @Test
     void testSolutionCountCommand() throws IOException {
-        int exitCode = FeatJAR.run("count-sat4j", "--input", "../formula/src/testFixtures/resources/GPL/model.xml");
+        int exitCode = FeatJAR.runTest("count-sat4j", "--input", "../formula/src/testFixtures/resources/GPL/model.xml");
         Assertions.assertEquals(0, exitCode);
 
-        exitCode = FeatJAR.run(
+        exitCode = FeatJAR.runTest(
                 "count-sat4j",
                 "--input",
                 "../formula/src/testFixtures/resources/GPL/model.xml",
@@ -161,10 +161,11 @@ public class SAT4JCommandsTest {
 
     @Test
     void testSolutionsCommand() throws IOException {
-        int exitCode = FeatJAR.run("solutions-sat4j", "--input", "../formula/src/testFixtures/resources/GPL/model.xml");
+        int exitCode =
+                FeatJAR.runTest("solutions-sat4j", "--input", "../formula/src/testFixtures/resources/GPL/model.xml");
         Assertions.assertEquals(0, exitCode);
 
-        exitCode = FeatJAR.run(
+        exitCode = FeatJAR.runTest(
                 "solutions-sat4j",
                 "--input",
                 "../formula/src/testFixtures/resources/GPL/model.xml",
@@ -187,10 +188,10 @@ public class SAT4JCommandsTest {
 
     @Test
     void testTWiseCommand() throws IOException {
-        int exitCode = FeatJAR.run("yasa", "--input", "../formula/src/testFixtures/resources/GPL/model.xml");
+        int exitCode = FeatJAR.runTest("yasa", "--input", "../formula/src/testFixtures/resources/GPL/model.xml");
         Assertions.assertEquals(0, exitCode);
 
-        exitCode = FeatJAR.run(
+        exitCode = FeatJAR.runTest(
                 "yasa",
                 "--input",
                 "../formula/src/testFixtures/resources/GPL/model.xml",
@@ -210,7 +211,7 @@ public class SAT4JCommandsTest {
                 "100");
         Assertions.assertEquals(0, exitCode);
 
-        exitCode = FeatJAR.run(
+        exitCode = FeatJAR.runTest(
                 "yasa",
                 "--input",
                 "../formula/src/testFixtures/resources/GPL/model.xml",

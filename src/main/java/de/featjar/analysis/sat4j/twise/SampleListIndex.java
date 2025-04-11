@@ -20,13 +20,10 @@
  */
 package de.featjar.analysis.sat4j.twise;
 
-import de.featjar.analysis.sat4j.solver.ModalImplicationGraph;
 import de.featjar.base.data.ExpandableIntegerList;
 import de.featjar.formula.assignment.BooleanAssignment;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.function.Predicate;
 
 /**
  * Calculates statistics regarding t-wise feature coverage of a set of
@@ -34,49 +31,72 @@ import java.util.function.Predicate;
  *
  * @author Sebastian Krieter
  */
-public class SampleListIndex implements Predicate<int[]> {
+public class SampleListIndex {
 
-    private final ArrayList<ExpandableIntegerList> indexedSolutions;
-    private final ExpandableIntegerList[] selectedIndexedSolutions;
+    private final ExpandableIntegerList[] bitSetReference;
+    private final int numberOfVariables;
+    private int sampleSize;
 
-    public SampleListIndex(List<? extends BooleanAssignment> sample, final int size, final int t) {
-        indexedSolutions = new ArrayList<>(2 * size);
-        for (int i = 2 * size; i >= 0; --i) {
-            indexedSolutions.add(new ExpandableIntegerList());
+    public SampleListIndex(final int numberOfVariables) {
+        this.numberOfVariables = numberOfVariables;
+        bitSetReference = new ExpandableIntegerList[2 * numberOfVariables + 1];
+
+        sampleSize = 0;
+        for (int j = 0; j < bitSetReference.length; j++) {
+            bitSetReference[j] = new ExpandableIntegerList();
         }
-        int configurationIndex = 0;
-        for (BooleanAssignment configuration : sample) {
-            final int[] literals = configuration.get();
-            for (int i = 0; i < literals.length; i++) {
-                final int literal = literals[i];
-                if (literal != 0) {
-                    indexedSolutions
-                            .get(ModalImplicationGraph.getVertexIndex(literal))
-                            .add(configurationIndex);
-                }
-            }
-            configurationIndex++;
-        }
-        selectedIndexedSolutions = new ExpandableIntegerList[t];
     }
 
-    @Override
-    public boolean test(int[] literals) {
-        if (literals.length < 2) {
-            return !indexedSolutions
-                    .get(ModalImplicationGraph.getVertexIndex(literals[0]))
-                    .isEmpty();
+    public SampleListIndex(final int numberOfVariables, int numberOfInitialConfigs) {
+        this.numberOfVariables = numberOfVariables;
+        bitSetReference = new ExpandableIntegerList[2 * numberOfVariables + 1];
+
+        sampleSize = 0;
+        for (int j = 0; j < bitSetReference.length; j++) {
+            bitSetReference[j] = new ExpandableIntegerList(numberOfInitialConfigs);
         }
+    }
+
+    public SampleListIndex(List<? extends BooleanAssignment> sample, final int numberOfVariables) {
+        this(numberOfVariables, sample.size());
+        sample.forEach(this::addConfiguration);
+    }
+
+    public void addConfiguration(BooleanAssignment config) {
+        addConfiguration(config.get());
+    }
+
+    public void addConfiguration(int[] config) {
+        int configurationIndex = sampleSize++;
+
+        final int[] literals = config;
         for (int i = 0; i < literals.length; i++) {
-            final ExpandableIntegerList indexedSolution =
-                    indexedSolutions.get(ModalImplicationGraph.getVertexIndex(literals[i]));
+            final int literal = literals[i];
+            if (literal != 0) {
+                bitSetReference[numberOfVariables + literal].add(configurationIndex);
+            }
+        }
+    }
+
+    public boolean test(int... literals) {
+        return index(literals) >= 0;
+    }
+
+    public int index(int... literals) {
+        if (literals.length < 2) {
+            ExpandableIntegerList i0 = bitSetReference[numberOfVariables + literals[0]];
+            return i0.isEmpty() ? -1 : i0.get(0);
+        }
+        ExpandableIntegerList[] selectedIndexedSolutions = new ExpandableIntegerList[literals.length];
+        for (int i = 0; i < literals.length; i++) {
+            final ExpandableIntegerList indexedSolution = bitSetReference[numberOfVariables + literals[i]];
             if (indexedSolution.size() == 0) {
-                return false;
+                return -1;
             }
             selectedIndexedSolutions[i] = indexedSolution;
         }
         Arrays.sort(selectedIndexedSolutions, (a, b) -> a.size() - b.size());
-        final int[] ix = new int[literals.length - 1];
+        final int[] searchIndices = new int[literals.length - 1];
 
         final ExpandableIntegerList i0 = selectedIndexedSolutions[0];
         final int[] ia0 = i0.getInternalArray();
@@ -84,17 +104,45 @@ public class SampleListIndex implements Predicate<int[]> {
         for (int i = 0; i < i0.size(); i++) {
             int id0 = ia0[i];
             for (int j = 1; j < literals.length; j++) {
-                final ExpandableIntegerList i1 = selectedIndexedSolutions[j];
-                int binarySearch = Arrays.binarySearch(i1.getInternalArray(), ix[j - 1], i1.size(), id0);
-                if (binarySearch < 0) {
-                    ix[j - 1] = -binarySearch - 1;
-                    continue loop;
+                final ExpandableIntegerList ij = selectedIndexedSolutions[j];
+                final int searchIndex = search(ij, searchIndices, id0, j);
+                if (searchIndex < 0) {
+                    int nextIndex = -searchIndex - 1;
+                    if (nextIndex < ij.size()) {
+                        searchIndices[j - 1] = nextIndex;
+                        continue loop;
+                    } else {
+                        return -1;
+                    }
                 } else {
-                    ix[j - 1] = binarySearch;
+                    searchIndices[j - 1] = searchIndex;
                 }
             }
-            return true;
+            return id0;
         }
-        return false;
+        return -1;
+    }
+
+    private int search(ExpandableIntegerList ij, final int[] searchIndices, int id0, int j) {
+        int minIndex = searchIndices[j - 1];
+        int maxIndex = ij.size();
+        int[] iax = ij.getInternalArray();
+        if (maxIndex - minIndex < 8) {
+            for (int k = minIndex; k < maxIndex; k++) {
+                int l = iax[k];
+                if (l == id0) {
+                    return k;
+                } else if (l > id0) {
+                    return -(k + 1);
+                }
+            }
+            return -(maxIndex + 1);
+        } else {
+            return Arrays.binarySearch(iax, minIndex, maxIndex, id0);
+        }
+    }
+
+    public int size() {
+        return sampleSize;
     }
 }

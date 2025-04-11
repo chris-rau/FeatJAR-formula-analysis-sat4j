@@ -23,11 +23,9 @@ package de.featjar.analysis.sat4j.twise;
 import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.Dependency;
 import de.featjar.base.computation.IComputation;
-import de.featjar.base.data.Combination;
 import de.featjar.formula.VariableMap;
 import de.featjar.formula.assignment.BooleanAssignmentList;
 import java.util.List;
-import java.util.Objects;
 
 /**
  * Calculates statistics regarding t-wise feature coverage of a set of
@@ -47,40 +45,39 @@ public class RelativeTWiseCoverageComputation extends ATWiseCoverageComputation 
         super(other);
     }
 
+    private BooleanAssignmentList referenceSample;
     private SampleBitIndex referenceIndex;
 
     @Override
-    protected void init(List<Object> dependencyList) {
-        super.init(dependencyList);
-        BooleanAssignmentList referenceSample =
-                REFERENCE_SAMPLE.get(dependencyList).toSolutionList();
-        VariableMap referenceVariableMap = referenceSample.getVariableMap();
-        VariableMap sampleVariableMap = sample.getVariableMap();
-        if (!Objects.equals(referenceVariableMap, sampleVariableMap)) {
-            throw new IllegalArgumentException("Variable map of reference sample is different from given sample.");
-        } else if (referenceVariableMap.containsAllObjects(sampleVariableMap)
-                && sampleVariableMap.containsAllObjects(referenceVariableMap)) {
-            referenceSample.adapt(sampleVariableMap);
-        } else {
-            throw new IllegalArgumentException("Variable map of reference sample is different from given sample.");
-        }
-        referenceIndex = new SampleBitIndex(referenceSample.getAll(), size);
+    protected void initWithOriginalVariableMap(List<Object> dependencyList) {
+        super.initWithOriginalVariableMap(dependencyList);
+        referenceSample = REFERENCE_SAMPLE.get(dependencyList).toSolutionList();
     }
 
     @Override
-    protected void count(Combination<Environment> combo) {
-        int[] select = combo.getSelection(literals);
-        for (int g : gray) {
-            if (referenceIndex.test(select)) {
-                if (sampleIndex.test(select)) {
-                    combo.environment.statistic.incNumberOfCoveredConditions();
-                } else {
-                    combo.environment.statistic.incNumberOfUncoveredConditions();
-                }
-            } else {
-                combo.environment.statistic.incNumberOfInvalidConditions();
-            }
-            select[g] = -select[g];
+    protected VariableMap getReferenceVariableMap() {
+        return referenceSample.getVariableMap();
+    }
+
+    @Override
+    protected void adaptToMergedVariableMap(VariableMap mergedVariableMap) {
+        super.adaptToMergedVariableMap(mergedVariableMap);
+        referenceSample.adapt(mergedVariableMap);
+    }
+
+    @Override
+    protected void initWithAdaptedVariableMap(List<Object> dependencyList) {
+        super.initWithAdaptedVariableMap(dependencyList);
+        referenceIndex = new SampleBitIndex(
+                referenceSample.getAll(), referenceSample.getVariableMap().getVariableCount());
+    }
+
+    @Override
+    protected void countUncovered(int[] uncoveredInteraction, CoverageStatistic statistic) {
+        if (referenceIndex.test(uncoveredInteraction)) {
+            statistic.incNumberOfUncoveredConditions();
+        } else {
+            statistic.incNumberOfInvalidConditions();
         }
     }
 }

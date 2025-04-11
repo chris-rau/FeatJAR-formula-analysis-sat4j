@@ -39,18 +39,9 @@ public class TWiseCommand extends ATWiseCommand {
     }
 
     @Override
-    public IComputation<BooleanAssignmentList> newAnalysis(
+    public IComputation<BooleanAssignmentList> newTWiseAnalysis(
             OptionList optionParser, IComputation<BooleanAssignmentList> formula) {
-        IComputation<BooleanAssignmentList> analysis = formula.map(YASA::new)
-                .set(YASA.T, optionParser.get(T_OPTION))
-                .set(YASA.ITERATIONS, 0)
-                .set(YASA.CONFIGURATION_LIMIT, optionParser.get(LIMIT_OPTION))
-                .set(
-                        YASA.INITIAL_SAMPLE_COUNTS_TOWARDS_CONFIGURATION_LIMIT,
-                        optionParser.get(INITIAL_SAMPLE_COUNTS_TOWARDS_CONFIGURATION_LIMIT))
-                .set(YASA.RANDOM_SEED, optionParser.get(RANDOM_SEED_OPTION))
-                .set(YASA.SAT_TIMEOUT, optionParser.get(SAT_TIMEOUT_OPTION));
-        return setInitialSample(optionParser, analysis, YASA.INITIAL_SAMPLE);
+        return formula.map(YASA::new).set(YASA.ITERATIONS, 0);
     }
 
     @Override

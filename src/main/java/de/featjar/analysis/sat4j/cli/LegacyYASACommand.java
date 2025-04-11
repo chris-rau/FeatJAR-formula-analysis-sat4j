@@ -42,24 +42,22 @@ public class LegacyYASACommand extends ATWiseCommand {
             .setDescription("Number of iterations.") //
             .setDefaultValue(1);
 
+    public static final Option<Integer> INTERNAL_SOLUTION_LIMIT = Option.newOption(
+                    "internal-limit", Option.IntegerParser) //
+            .setDescription("Number of internally cached configurations.")
+            .setDefaultValue(65_536);
+
     @Override
     public Optional<String> getDescription() {
         return Optional.of("Computes solutions for a given formula using SAT4J. Uses YASA.");
     }
 
     @Override
-    public IComputation<BooleanAssignmentList> newAnalysis(
+    public IComputation<BooleanAssignmentList> newTWiseAnalysis(
             OptionList optionParser, IComputation<BooleanAssignmentList> formula) {
-        IComputation<BooleanAssignmentList> analysis = formula.map(YASALegacy::new)
-                .set(YASALegacy.T, optionParser.get(T_OPTION))
-                .set(YASALegacy.CONFIGURATION_LIMIT, optionParser.get(LIMIT_OPTION))
+        return formula.map(YASALegacy::new)
                 .set(YASALegacy.ITERATIONS, optionParser.get(ITERATIONS_OPTION))
-                .set(
-                        YASALegacy.INITIAL_SAMPLE_COUNTS_TOWARDS_CONFIGURATION_LIMIT,
-                        optionParser.get(INITIAL_SAMPLE_COUNTS_TOWARDS_CONFIGURATION_LIMIT))
-                .set(YASALegacy.RANDOM_SEED, optionParser.get(RANDOM_SEED_OPTION))
-                .set(YASALegacy.SAT_TIMEOUT, optionParser.get(SAT_TIMEOUT_OPTION));
-        return setInitialSample(optionParser, analysis, YASALegacy.INITIAL_SAMPLE);
+                .set(YASALegacy.INTERNAL_SOLUTION_LIMIT, optionParser.get(INTERNAL_SOLUTION_LIMIT));
     }
 
     @Override

@@ -49,28 +49,18 @@ public class YASACommand extends ATWiseCommand {
     public static final Option<Boolean> INCREMENTAL = Option.newFlag("incremental") //
             .setDescription("Start with smaller values for t.");
 
-    // TODO handle other combination specs
-
     @Override
     public Optional<String> getDescription() {
         return Optional.of("Computes solutions for a given formula using SAT4J. Uses the most recent version of YASA.");
     }
 
     @Override
-    public IComputation<BooleanAssignmentList> newAnalysis(
+    public IComputation<BooleanAssignmentList> newTWiseAnalysis(
             OptionList optionParser, IComputation<BooleanAssignmentList> formula) {
-        IComputation<BooleanAssignmentList> analysis = formula.map(YASA::new)
-                .set(YASA.T, optionParser.get(T_OPTION))
-                .set(YASA.CONFIGURATION_LIMIT, optionParser.get(LIMIT_OPTION))
+        return formula.map(YASA::new)
                 .set(YASA.ITERATIONS, optionParser.get(ITERATIONS_OPTION))
-                .set(
-                        YASA.INITIAL_SAMPLE_COUNTS_TOWARDS_CONFIGURATION_LIMIT,
-                        optionParser.get(INITIAL_SAMPLE_COUNTS_TOWARDS_CONFIGURATION_LIMIT))
-                .set(YASA.RANDOM_SEED, optionParser.get(RANDOM_SEED_OPTION))
-                .set(YASA.SAT_TIMEOUT, optionParser.get(SAT_TIMEOUT_OPTION))
                 .set(YASA.INTERNAL_SOLUTION_LIMIT, optionParser.get(INTERNAL_SOLUTION_LIMIT))
                 .set(YASA.INCREMENTAL_T, optionParser.get(INCREMENTAL));
-        return setInitialSample(optionParser, analysis, YASA.INITIAL_SAMPLE);
     }
 
     @Override

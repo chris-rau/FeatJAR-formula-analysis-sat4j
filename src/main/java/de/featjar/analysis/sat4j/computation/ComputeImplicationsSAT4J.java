@@ -43,7 +43,7 @@ import java.util.Random;
  *
  * @author Sebastian Krieter
  */
-public class ComputeAtomicSetsSAT4J extends ASAT4JAnalysis.Solution<BooleanAssignmentList> {
+public class ComputeImplicationsSAT4J extends ASAT4JAnalysis.Solution<BooleanAssignmentList> {
 
     public static final Dependency<BooleanAssignment> VARIABLES_OF_INTEREST =
             Dependency.newDependency(BooleanAssignment.class);
@@ -55,7 +55,7 @@ public class ComputeAtomicSetsSAT4J extends ASAT4JAnalysis.Solution<BooleanAssig
 
     private Random random;
 
-    public ComputeAtomicSetsSAT4J(IComputation<BooleanAssignmentList> clauseList) {
+    public ComputeImplicationsSAT4J(IComputation<BooleanAssignmentList> clauseList) {
         super(
                 clauseList,
                 Computations.of(new BooleanAssignment()),
@@ -63,7 +63,7 @@ public class ComputeAtomicSetsSAT4J extends ASAT4JAnalysis.Solution<BooleanAssig
                 Computations.of(Boolean.FALSE));
     }
 
-    protected ComputeAtomicSetsSAT4J(ComputeAtomicSetsSAT4J other) {
+    protected ComputeImplicationsSAT4J(ComputeImplicationsSAT4J other) {
         super(other);
     }
 
@@ -81,7 +81,7 @@ public class ComputeAtomicSetsSAT4J extends ASAT4JAnalysis.Solution<BooleanAssig
         boolean omitCore = OMIT_CORE.get(dependencyList);
         boolean omitSingles = OMIT_SINGLE_SETS.get(dependencyList);
 
-        final BooleanAssignmentList atomicSets = new BooleanAssignmentList(variableMap);
+        final BooleanAssignmentList implications = new BooleanAssignmentList(variableMap);
         variableCount = variableMap.getVariableCount();
         bitSetSize = 2 * variableCount;
         solutions = new ArrayList<>();
@@ -163,7 +163,7 @@ public class ComputeAtomicSetsSAT4J extends ASAT4JAnalysis.Solution<BooleanAssig
             solver.getAssignment().remove();
         }
         if (!omitCore) {
-            atomicSets.add(new BooleanAssignment(core.toArray()));
+            implications.add(new BooleanAssignment(core.toArray()));
         }
         for (int vi = 0; vi < bitSetSize; vi += 2) {
             progress.incrementCurrentStep();
@@ -171,10 +171,9 @@ public class ComputeAtomicSetsSAT4J extends ASAT4JAnalysis.Solution<BooleanAssig
             if (undecided.get(vi)) {
                 int v = (vi >> 1) + 1;
 
-                ExpandableIntegerList atomicSet = new ExpandableIntegerList();
-                atomicSet.add(v);
+                ExpandableIntegerList implicationSet = new ExpandableIntegerList();
+                implicationSet.add(v);
                 undecided.clear(vi);
-                undecided.clear(vi + 1);
 
                 commonLiterals = new BitSet(bitSetSize);
                 commonLiterals.xor(undecided);
@@ -182,15 +181,13 @@ public class ComputeAtomicSetsSAT4J extends ASAT4JAnalysis.Solution<BooleanAssig
                 for (BitSet solution : solutions) {
                     if (solution.get(vi)) {
                         commonLiterals.and(solution);
-                    } else {
-                        commonLiterals.andNot(solution);
-                    }
-                    if (commonLiterals.isEmpty()) {
-                        break;
+                        if (commonLiterals.isEmpty()) {
+                            break;
+                        }
                     }
                 }
 
-                int ui = commonLiterals.nextSetBit(vi + 2);
+                int ui = commonLiterals.nextSetBit(0);
                 while (ui >= 0) {
                     final int u;
                     if (((ui & 1) == 0)) {
@@ -199,23 +196,23 @@ public class ComputeAtomicSetsSAT4J extends ASAT4JAnalysis.Solution<BooleanAssig
                         u = -((ui >> 1) + 1);
                         ui--;
                     }
-                    if (unsat(solver, -v, u) && unsat(solver, v, -u)) {
-                        atomicSet.add(u);
-                        undecided.clear(ui);
-                        undecided.clear(ui + 1);
+                    if (unsat(solver, v, -u)) {
+                        implicationSet.add(u);
+                    } else {
+                        commonLiterals.and(solutions.get(solutions.size() - 1));
                     }
                     ui = commonLiterals.nextSetBit(ui + 2);
                 }
 
-                if (!omitSingles || atomicSet.size() > 1) {
-                    atomicSets.add(new BooleanAssignment(atomicSet.toArray()));
+                if (!omitSingles || implicationSet.size() > 1) {
+                    implications.add(new BooleanAssignment(implicationSet.toArray()));
                 }
             }
         }
 
         solutions = null;
         random = null;
-        return Result.of(atomicSets);
+        return Result.of(implications);
     }
 
     private boolean unsat(SAT4JSolutionSolver solver, final int v, int u) {
@@ -226,7 +223,7 @@ public class ComputeAtomicSetsSAT4J extends ASAT4JAnalysis.Solution<BooleanAssig
             if (hasSolution.isEmpty()) {
                 return false;
             } else if (hasSolution.valueEquals(Boolean.TRUE)) {
-                addSolution(solver.getInternalSolution(), Math.abs(v));
+                addSolution(solver.getInternalSolution(), 0);
                 solver.shuffleOrder(random);
                 return false;
             }
