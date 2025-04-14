@@ -78,9 +78,9 @@ public class TWiseCoverageCommand extends AAnalysisCommand<CoverageStatistic> {
             .setDefaultValue(List.of(2));
 
     /**
-     * Path option for combination specs.
+     * Path option for combination sets.
      */
-    public static final Option<Path> COMBINATION_SPECS = Option.newOption("combination-sets", Option.PathParser)
+    public static final Option<Path> COMBINATION_SETS = Option.newOption("combination-sets", Option.PathParser)
             .setRequired(false)
             .setDefaultValue(null)
             .setDescription("Path to combination specification files.");
@@ -137,7 +137,7 @@ public class TWiseCoverageCommand extends AAnalysisCommand<CoverageStatistic> {
         }
         coverageComputation.set(ATWiseCoverageComputation.T, ts);
 
-        Result<Path> combinationSpecsPath = optionParser.getResult(COMBINATION_SPECS);
+        Result<Path> combinationSpecsPath = optionParser.getResult(COMBINATION_SETS);
         if (combinationSpecsPath.isPresent()) {
             BooleanAssignmentGroups tWiseCombinationsList = IO.load(
                             combinationSpecsPath.get(), new BooleanAssignmentGroupsFormats())
