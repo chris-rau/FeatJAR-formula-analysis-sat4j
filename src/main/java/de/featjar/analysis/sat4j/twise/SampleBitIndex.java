@@ -110,6 +110,10 @@ public class SampleBitIndex {
         return bitSet;
     }
 
+    public BitSet getInternalBitSet(int literal) {
+        return bitSetReference[numberOfVariables + literal];
+    }
+
     public BitSet getNegatedBitSet(int... literals) {
         BitSet first = bitSetReference[numberOfVariables - literals[0]];
         BitSet bitSet = new BitSet(first.size());
@@ -137,19 +141,29 @@ public class SampleBitIndex {
     }
 
     public boolean test(int... literals) {
-        if (literals.length == 2) {
-            return bitSetReference[numberOfVariables + literals[0]].intersects(
-                    bitSetReference[numberOfVariables + literals[1]]);
+        switch (literals.length) {
+            case 0:
+                return false;
+            case 1:
+                return getInternalBitSet(literals[0]).cardinality() > 0;
+            case 2:
+                return bitSetReference[numberOfVariables + literals[0]].intersects(
+                        bitSetReference[numberOfVariables + literals[1]]);
+            default:
+                return !getBitSet(literals).isEmpty();
         }
-        return !getBitSet(literals).isEmpty();
     }
 
     public int index(int... literals) {
-        return getBitSet(literals).length();
+        return literals.length == 1
+                ? getInternalBitSet(literals[0]).length()
+                : getBitSet(literals).length();
     }
 
     public int size(int... literals) {
-        return getBitSet(literals).cardinality();
+        return literals.length == 1
+                ? getInternalBitSet(literals[0]).cardinality()
+                : getBitSet(literals).cardinality();
     }
 
     public int size() {
