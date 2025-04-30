@@ -178,7 +178,7 @@ public abstract class ATWiseCoverageComputation extends AComputation<CoverageSta
                 final int[] interaction = c.select();
                 for (int g : grayCode) {
                     checkCancel();
-                    progress.incrementCurrentStep();
+                    progress.incrementCurrentStepSynchronized();
                     if (interactionFilter.test(interaction)) {
                         statistic.incNumberOfIgnoredConditions();
                     } else {
