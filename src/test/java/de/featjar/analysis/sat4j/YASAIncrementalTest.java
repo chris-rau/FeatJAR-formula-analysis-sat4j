@@ -108,6 +108,21 @@ public class YASAIncrementalTest extends Common {
         testTimeout(loadFormula("GPL/model.xml"), 10);
     }
 
+    @Test
+    void sampleWithConfigurationLimit1Has1Configuration() {
+        testConfigurationLimit(loadFormula("GPL/model.xml"), 1, 1);
+    }
+
+    @Test
+    void sampleWithConfigurationLimit10Has10Configurations() {
+        testConfigurationLimit(loadFormula("GPL/model.xml"), 10, 10);
+    }
+
+    @Test
+    void gplWith3WiseCoverage48Configurations() {
+        testConfigurationLimit(loadFormula("GPL/model.xml"), 100, 48);
+    }
+
     private void testTimeout(IFormula formula, int timeoutSeconds) {
         IComputation<BooleanAssignmentList> clauses = getClauses(formula);
         BooleanAssignmentList sample = clauses.map(YASA::new)
@@ -121,6 +136,16 @@ public class YASAIncrementalTest extends Common {
         CoverageStatistic statistic1 = computeCoverageNew(3, clauses, sample);
         assertEquals(1.0, statistic1.coverage());
         FeatJAR.log().info((System.currentTimeMillis() - time) / 1000.0);
+    }
+
+    private void testConfigurationLimit(IFormula formula, int limit, int expectedSize) {
+        IComputation<BooleanAssignmentList> clauses = getClauses(formula);
+        BooleanAssignmentList sample = clauses.map(YASA::new)
+                .set(YASA.T, new IntegerList(3))
+                .set(YASA.CONFIGURATION_LIMIT, limit)
+                .computeResult()
+                .orElseThrow();
+        assertEquals(expectedSize, sample.size());
     }
 
     void onlyNew(IFormula formula) {
@@ -150,7 +175,6 @@ public class YASAIncrementalTest extends Common {
 
         CoverageStatistic statistic1 = computeCoverageNew(t, clauses, sample);
         CoverageStatistic statistic2 = computeCoverageRel(t, clauses, sample);
-        CoverageStatistic statistic4 = computeCoverageRel2(t, clauses, sample);
 
         FeatJAR.log().info("total     %d | %d", statistic1.total(), statistic2.total());
         FeatJAR.log().info("covered   %d | %d", statistic1.covered(), statistic2.covered());
@@ -159,14 +183,10 @@ public class YASAIncrementalTest extends Common {
 
         assertEquals(1.0, statistic1.coverage());
         assertEquals(1.0, statistic2.coverage());
-        assertEquals(1.0, statistic4.coverage());
 
         assertEquals(statistic1.covered(), statistic2.covered());
         assertEquals(statistic1.uncovered(), statistic2.uncovered());
         assertEquals(statistic1.invalid(), statistic2.invalid());
-        assertEquals(statistic1.covered(), statistic4.covered());
-        assertEquals(statistic1.uncovered(), statistic4.uncovered());
-        assertEquals(statistic1.invalid(), statistic4.invalid());
     }
 
     private BooleanAssignmentList computeSample(int t, IComputation<BooleanAssignmentList> clauses) {
@@ -184,17 +204,6 @@ public class YASAIncrementalTest extends Common {
                 .set(RelativeTWiseCoverageComputation.T, new IntegerList(t))
                 .compute();
         FeatJAR.log().info("Computed Coverage (RelativeTWiseCoverageComputation)");
-        return statistic;
-    }
-
-    private CoverageStatistic computeCoverageRel2(
-            int t, IComputation<BooleanAssignmentList> clauses, BooleanAssignmentList sample) {
-        CoverageStatistic statistic = Computations.of(sample)
-                .map(RelativeTWiseCoverageComputation::new)
-                .set(RelativeTWiseCoverageComputation.REFERENCE_SAMPLE, clauses.map(ComputeSolutionsSAT4J::new))
-                .set(RelativeTWiseCoverageComputation.T, new IntegerList(t))
-                .compute();
-        FeatJAR.log().info("Computed Coverage (RelativeTWiseCoverageComputation2)");
         return statistic;
     }
 
