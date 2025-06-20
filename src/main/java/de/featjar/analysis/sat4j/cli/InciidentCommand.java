@@ -21,7 +21,6 @@
 package de.featjar.analysis.sat4j.cli;
 
 import de.featjar.analysis.ExternalConfigurationTester;
-import de.featjar.analysis.sat4j.computation.ATWiseSampleComputation;
 import de.featjar.analysis.sat4j.computation.Inciident;
 import de.featjar.base.cli.Option;
 import de.featjar.base.cli.OptionList;
@@ -94,7 +93,7 @@ public abstract class InciidentCommand extends ASAT4JAnalysisCommand<BooleanAssi
                             initialSamplePath.get(), BooleanAssignmentGroupsFormats.getInstance())
                     .orElseLog(Verbosity.WARNING);
             if (initialSample != null) {
-                analysis.set(ATWiseSampleComputation.INITIAL_SAMPLE, initialSample.getFirstGroup());
+                analysis.set(Inciident.INITIAL_SAMPLE, initialSample.getFirstGroup());
             }
         }
 
