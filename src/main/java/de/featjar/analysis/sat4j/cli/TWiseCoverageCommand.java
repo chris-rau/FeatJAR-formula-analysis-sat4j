@@ -21,16 +21,17 @@
 package de.featjar.analysis.sat4j.cli;
 
 import de.featjar.analysis.AAnalysisCommand;
+import de.featjar.analysis.sat4j.computation.VariableCombinationSpecifictionComputation;
 import de.featjar.analysis.sat4j.twise.ATWiseCoverageComputation;
 import de.featjar.analysis.sat4j.twise.AbsoluteTWiseCoverageComputation;
 import de.featjar.analysis.sat4j.twise.ConstraintedCoverageComputation;
 import de.featjar.analysis.sat4j.twise.CoverageStatistic;
 import de.featjar.analysis.sat4j.twise.RelativeTWiseCoverageComputation;
+import de.featjar.analysis.sat4j.twise.SampleBitIndex;
 import de.featjar.base.cli.Option;
 import de.featjar.base.cli.OptionList;
 import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.IComputation;
-import de.featjar.base.data.IntegerList;
 import de.featjar.base.data.Result;
 import de.featjar.base.io.IO;
 import de.featjar.base.io.format.IFormat;
@@ -44,11 +45,10 @@ import de.featjar.formula.computation.ComputeNNFFormula;
 import de.featjar.formula.io.BooleanAssignmentGroupsFormats;
 import de.featjar.formula.io.FormulaFormats;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Optional;
 
 /**
- * Computes atomic sets for a given formula using SAT4J.
+ * Computes t-wise coverage for a given formula using SAT4J.
  *
  * @author Elias Kuiter
  * @author Sebastian Krieter
@@ -73,19 +73,15 @@ public class TWiseCoverageCommand extends AAnalysisCommand<CoverageStatistic> {
     /**
      * Value of t.
      */
-    public static final Option<List<Integer>> T_OPTION = Option.newListOption("t", Option.IntegerParser) //
-            .setDescription("Value(s) of parameter t.") //
-            .setDefaultValue(List.of(2));
+    public static final Option<Integer> T_OPTION = Option.newOption("t", Option.IntegerParser) //
+            .setDescription("Value of parameter t.") //
+            .setDefaultValue(2);
 
-    /**
-     * Path option for combination sets.
-     */
-    public static final Option<Path> COMBINATION_SETS = Option.newOption("combination-sets", Option.PathParser)
-            .setRequired(false)
-            .setDefaultValue(null)
-            .setDescription("Path to combination specification files.");
+    public static final Option<Path> INCLUDE_INTERACTIONS = Option.newOption("include-interactions", Option.PathParser)
+            .setDescription("Path to list of interactions that will be considered.")
+            .setValidator(Option.PathValidator);
 
-    public static final Option<Path> INGNORE_INTERACTIONS = Option.newOption("ignore-interactions", Option.PathParser)
+    public static final Option<Path> EXCLUDE_INTERACTIONS = Option.newOption("exclude-interactions", Option.PathParser)
             .setDescription("Path to list of interactions that will be ignored.")
             .setValidator(Option.PathValidator);
 
@@ -116,7 +112,7 @@ public class TWiseCoverageCommand extends AAnalysisCommand<CoverageStatistic> {
 
         Path fmPath = optionParser.getResult(FM_OPTION).orElse(null);
         Path referencePath = optionParser.getResult(REFERENCE_SAMPLE_OPTION).orElse(null);
-        IntegerList ts = new IntegerList(optionParser.get(T_OPTION));
+        int t = optionParser.get(T_OPTION);
 
         if (fmPath != null && referencePath != null) {
             throw new IllegalArgumentException("Cannot set " + FM_OPTION.getArgumentName() + " and "
@@ -129,33 +125,36 @@ public class TWiseCoverageCommand extends AAnalysisCommand<CoverageStatistic> {
 
         IComputation<CoverageStatistic> coverageComputation;
         if (fmPath != null) {
-            coverageComputation = computeFMCoverage(sample, fmPath);
+            coverageComputation = computeFMCoverage(sample, fmPath, t);
         } else if (referencePath != null) {
-            coverageComputation = computeRelativeCoverage(sample, referencePath);
+            coverageComputation = computeRelativeCoverage(sample, referencePath, t);
         } else {
             coverageComputation = computeAbsoluteCoverage(sample);
+            coverageComputation.set(
+                    ATWiseCoverageComputation.COMBINATION_SET,
+                    new VariableCombinationSpecifictionComputation(sample, Computations.of(t)));
         }
-        coverageComputation.set(ATWiseCoverageComputation.T, ts);
 
-        Result<Path> combinationSpecsPath = optionParser.getResult(COMBINATION_SETS);
-        if (combinationSpecsPath.isPresent()) {
-            BooleanAssignmentGroups tWiseCombinationsList = IO.load(
-                            combinationSpecsPath.get(), new BooleanAssignmentGroupsFormats())
+        Result<Path> consideredInteractionsPath = optionParser.getResult(INCLUDE_INTERACTIONS);
+        if (consideredInteractionsPath.isPresent()) {
+            BooleanAssignmentGroups consideredInteractions = IO.load(
+                            consideredInteractionsPath.get(), new BooleanAssignmentGroupsFormats())
                     .orElseLog(Verbosity.WARNING);
-            if (tWiseCombinationsList != null) {
+            if (consideredInteractions != null) {
                 coverageComputation.set(
-                        ATWiseCoverageComputation.COMBINATION_SETS, tWiseCombinationsList.getMergedGroups());
+                        ATWiseCoverageComputation.INCLUDE_INTERACTIONS,
+                        new SampleBitIndex(consideredInteractions.getMergedGroups()));
             }
         }
-
-        Result<Path> ignoreInteractionsPath = optionParser.getResult(INGNORE_INTERACTIONS);
+        Result<Path> ignoreInteractionsPath = optionParser.getResult(EXCLUDE_INTERACTIONS);
         if (ignoreInteractionsPath.isPresent()) {
             BooleanAssignmentGroups ignoreInteractions = IO.load(
                             ignoreInteractionsPath.get(), new BooleanAssignmentGroupsFormats())
                     .orElseLog(Verbosity.WARNING);
             if (ignoreInteractions != null) {
                 coverageComputation.set(
-                        ATWiseCoverageComputation.EXCLUDE_INTERACTIONS, ignoreInteractions.getMergedGroups());
+                        ATWiseCoverageComputation.EXCLUDE_INTERACTIONS,
+                        new SampleBitIndex(ignoreInteractions.getMergedGroups()));
             }
         }
 
@@ -167,16 +166,21 @@ public class TWiseCoverageCommand extends AAnalysisCommand<CoverageStatistic> {
     }
 
     private IComputation<CoverageStatistic> computeRelativeCoverage(
-            IComputation<BooleanAssignmentList> sample, Path referencePath) {
+            IComputation<BooleanAssignmentList> sample, Path referencePath, int t) {
         BooleanAssignmentList referenceSample = IO.load(referencePath, BooleanAssignmentGroupsFormats.getInstance())
                 .map(BooleanAssignmentGroups::getFirstGroup)
                 .orElseThrow();
 
         return sample.map(RelativeTWiseCoverageComputation::new)
-                .set(RelativeTWiseCoverageComputation.REFERENCE_SAMPLE, referenceSample);
+                .set(RelativeTWiseCoverageComputation.REFERENCE_SAMPLE, referenceSample)
+                .set(
+                        RelativeTWiseCoverageComputation.COMBINATION_SET,
+                        new VariableCombinationSpecifictionComputation(
+                                Computations.of(referenceSample), Computations.of(t)));
     }
 
-    private IComputation<CoverageStatistic> computeFMCoverage(IComputation<BooleanAssignmentList> sample, Path fmPath) {
+    private IComputation<CoverageStatistic> computeFMCoverage(
+            IComputation<BooleanAssignmentList> sample, Path fmPath, int t) {
         BooleanAssignmentList formula = IO.load(fmPath, BooleanAssignmentGroupsFormats.getInstance())
                 .map(cnf -> (IComputation<BooleanAssignmentList>)
                         Computations.of(cnf.getFirstGroup().toClauseList()))
@@ -188,7 +192,10 @@ public class TWiseCoverageCommand extends AAnalysisCommand<CoverageStatistic> {
                 .computeResult()
                 .orElseThrow();
         return sample.map(ConstraintedCoverageComputation::new)
-                .set(ConstraintedCoverageComputation.BOOLEAN_CLAUSE_LIST, formula);
+                .set(ConstraintedCoverageComputation.BOOLEAN_CLAUSE_LIST, formula)
+                .set(
+                        ATWiseCoverageComputation.COMBINATION_SET,
+                        new VariableCombinationSpecifictionComputation(Computations.of(formula), Computations.of(t)));
     }
 
     @Override

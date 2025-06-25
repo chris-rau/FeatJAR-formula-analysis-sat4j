@@ -20,7 +20,9 @@
  */
 package de.featjar.analysis.sat4j.twise;
 
+import de.featjar.formula.VariableMap;
 import de.featjar.formula.assignment.BooleanAssignment;
+import de.featjar.formula.assignment.BooleanAssignmentList;
 import java.util.BitSet;
 import java.util.List;
 
@@ -30,14 +32,16 @@ import java.util.List;
  *
  * @author Sebastian Krieter
  */
-public class SampleBitIndex {
+public class SampleBitIndex implements ISampleIndex {
 
-    private final BitSet[] bitSetReference;
-    private final int numberOfVariables;
+    private BitSet[] bitSetReference;
+    private int numberOfVariables;
     private int sampleSize;
+    private VariableMap variableMap;
 
-    public SampleBitIndex(final int numberOfVariables) {
-        this.numberOfVariables = numberOfVariables;
+    public SampleBitIndex(final VariableMap variableMap) {
+        this.variableMap = variableMap;
+        numberOfVariables = variableMap.getVariableCount();
         bitSetReference = new BitSet[2 * numberOfVariables + 1];
 
         sampleSize = 0;
@@ -46,8 +50,9 @@ public class SampleBitIndex {
         }
     }
 
-    public SampleBitIndex(final int numberOfVariables, int numberOfInitialConfigs) {
-        this.numberOfVariables = numberOfVariables;
+    public SampleBitIndex(final VariableMap variableMap, int numberOfInitialConfigs) {
+        this.variableMap = variableMap;
+        numberOfVariables = variableMap.getVariableCount();
         bitSetReference = new BitSet[2 * numberOfVariables + 1];
 
         sampleSize = 0;
@@ -56,8 +61,13 @@ public class SampleBitIndex {
         }
     }
 
-    public SampleBitIndex(List<? extends BooleanAssignment> sample, final int numberOfVariables) {
+    public SampleBitIndex(List<? extends BooleanAssignment> sample, final VariableMap numberOfVariables) {
         this(numberOfVariables, sample.size());
+        sample.forEach(this::addConfiguration);
+    }
+
+    public SampleBitIndex(BooleanAssignmentList sample) {
+        this(sample.getVariableMap(), sample.size());
         sample.forEach(this::addConfiguration);
     }
 
@@ -166,8 +176,13 @@ public class SampleBitIndex {
                 : getBitSet(literals).cardinality();
     }
 
+    // TODO rename
     public int size() {
         return sampleSize;
+    }
+
+    public int getNumberOfVariables() {
+        return numberOfVariables;
     }
 
     public int[] getConfiguration(int configurationID) {
@@ -180,5 +195,21 @@ public class SampleBitIndex {
             }
         }
         return model;
+    }
+
+    @Override
+    public SampleBitIndex adapt(VariableMap newVariableMap) {
+        int newNumberOfVariables = variableMap.getVariableCount();
+        BitSet[] newBitSetReference = new BitSet[2 * newNumberOfVariables + 1];
+
+        for (int i = 1; i <= numberOfVariables; i++) {
+            int adapt = variableMap.adapt(i, newVariableMap, true);
+            newBitSetReference[newNumberOfVariables + adapt] = bitSetReference[numberOfVariables + i];
+            newBitSetReference[newNumberOfVariables - adapt] = bitSetReference[numberOfVariables - i];
+        }
+        numberOfVariables = newNumberOfVariables;
+        bitSetReference = newBitSetReference;
+        variableMap = newVariableMap;
+        return this;
     }
 }

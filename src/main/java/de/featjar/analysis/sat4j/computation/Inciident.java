@@ -116,9 +116,8 @@ public class Inciident extends ASAT4JAnalysis.Solution<BooleanAssignment> {
         BooleanAssignmentList booleanAssignmentList = BOOLEAN_CLAUSE_LIST.get(dependencyList);
         VariableMap variableMap = booleanAssignmentList.getVariableMap();
         tester.setVariableMap(variableMap);
-        variableCount = variableMap.getVariableCount();
-        succeedingConfs = new SampleBitIndex(variableCount);
-        failingConfs = new SampleBitIndex(variableCount);
+        succeedingConfs = new SampleBitIndex(variableMap);
+        failingConfs = new SampleBitIndex(variableMap);
 
         BooleanAssignmentList initialSample = INITIAL_SAMPLE.get(dependencyList);
         initialSample.forEach(this::test);

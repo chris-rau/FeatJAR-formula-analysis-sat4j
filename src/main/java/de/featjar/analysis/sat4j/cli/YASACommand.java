@@ -20,11 +20,20 @@
  */
 package de.featjar.analysis.sat4j.cli;
 
+import de.featjar.analysis.sat4j.computation.VariableCombinationSpecifictionComputation;
 import de.featjar.analysis.sat4j.computation.YASA;
+import de.featjar.analysis.sat4j.twise.SampleBitIndex;
 import de.featjar.base.cli.Option;
 import de.featjar.base.cli.OptionList;
+import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.IComputation;
+import de.featjar.base.data.Result;
+import de.featjar.base.io.IO;
+import de.featjar.base.log.Log.Verbosity;
+import de.featjar.formula.assignment.BooleanAssignmentGroups;
 import de.featjar.formula.assignment.BooleanAssignmentList;
+import de.featjar.formula.io.BooleanAssignmentGroupsFormats;
+import java.nio.file.Path;
 import java.util.Optional;
 
 /**
@@ -49,6 +58,14 @@ public class YASACommand extends ATWiseCommand {
     public static final Option<Boolean> INCREMENTAL = Option.newFlag("incremental") //
             .setDescription("Start with smaller values for t.");
 
+    public static final Option<Path> INCLUDE_INTERACTIONS = Option.newOption("include-interactions", Option.PathParser)
+            .setDescription("Path to list of interactions that will be considered.")
+            .setValidator(Option.PathValidator);
+
+    public static final Option<Path> EXCLUDE_INTERACTIONS = Option.newOption("exclude-interactions", Option.PathParser)
+            .setDescription("Path to list of interactions that will be ignored.")
+            .setValidator(Option.PathValidator);
+
     @Override
     public Optional<String> getDescription() {
         return Optional.of("Computes solutions for a given formula using SAT4J. Uses the most recent version of YASA.");
@@ -57,10 +74,35 @@ public class YASACommand extends ATWiseCommand {
     @Override
     public IComputation<BooleanAssignmentList> newTWiseAnalysis(
             OptionList optionParser, IComputation<BooleanAssignmentList> formula) {
-        return formula.map(YASA::new)
+        IComputation<BooleanAssignmentList> analysis = formula.map(YASA::new)
+                .set(
+                        YASA.COMBINATION_SET,
+                        new VariableCombinationSpecifictionComputation(
+                                formula, Computations.of(optionParser.get(T_OPTION))))
+                .set(YASA.SAT_TIMEOUT, optionParser.get(SAT_TIMEOUT_OPTION))
                 .set(YASA.ITERATIONS, optionParser.get(ITERATIONS_OPTION))
                 .set(YASA.INTERNAL_SOLUTION_LIMIT, optionParser.get(INTERNAL_SOLUTION_LIMIT))
                 .set(YASA.INCREMENTAL_T, optionParser.get(INCREMENTAL));
+
+        Result<Path> consideredInteractionsPath = optionParser.getResult(INCLUDE_INTERACTIONS);
+        if (consideredInteractionsPath.isPresent()) {
+            BooleanAssignmentGroups consideredInteractions = IO.load(
+                            consideredInteractionsPath.get(), new BooleanAssignmentGroupsFormats())
+                    .orElseLog(Verbosity.WARNING);
+            if (consideredInteractions != null) {
+                analysis.set(YASA.INCLUDE_INTERACTIONS, new SampleBitIndex(consideredInteractions.getMergedGroups()));
+            }
+        }
+        Result<Path> ignoreInteractionsPath = optionParser.getResult(EXCLUDE_INTERACTIONS);
+        if (ignoreInteractionsPath.isPresent()) {
+            BooleanAssignmentGroups ignoreInteractions = IO.load(
+                            ignoreInteractionsPath.get(), new BooleanAssignmentGroupsFormats())
+                    .orElseLog(Verbosity.WARNING);
+            if (ignoreInteractions != null) {
+                analysis.set(YASA.EXCLUDE_INTERACTIONS, new SampleBitIndex(ignoreInteractions.getMergedGroups()));
+            }
+        }
+        return analysis;
     }
 
     @Override

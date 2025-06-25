@@ -20,19 +20,14 @@
  */
 package de.featjar.analysis.sat4j.computation;
 
-import de.featjar.analysis.sat4j.solver.ISelectionStrategy;
-import de.featjar.analysis.sat4j.solver.ModalImplicationGraph;
-import de.featjar.analysis.sat4j.solver.SAT4JSolutionSolver;
-import de.featjar.analysis.sat4j.solver.SAT4JSolver;
-import de.featjar.analysis.sat4j.twise.SampleListIndex;
+import de.featjar.analysis.sat4j.twise.IInteractionFilter;
+import de.featjar.base.computation.AComputation;
 import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.Dependency;
 import de.featjar.base.computation.IComputation;
 import de.featjar.base.computation.Progress;
-import de.featjar.base.data.IntegerList;
 import de.featjar.base.data.Result;
 import de.featjar.formula.VariableMap;
-import de.featjar.formula.assignment.BooleanAssignment;
 import de.featjar.formula.assignment.BooleanAssignmentList;
 import java.util.List;
 import java.util.Random;
@@ -43,37 +38,33 @@ import java.util.Random;
  *
  * @author Sebastian Krieter
  */
-public abstract class ATWiseSampleComputation extends ASAT4JAnalysis<BooleanAssignmentList> {
+public abstract class ATWiseSampleComputation extends AComputation<BooleanAssignmentList> {
 
-    public static final Dependency<BooleanAssignmentList> COMBINATION_SETS =
-            Dependency.newDependency(BooleanAssignmentList.class);
+    public static final Dependency<ICombinationSpecification> COMBINATION_SET =
+            Dependency.newDependency(ICombinationSpecification.class);
 
-    public static final Dependency<IntegerList> T = Dependency.newDependency(IntegerList.class);
-
-    public static final Dependency<BooleanAssignmentList> EXCLUDE_INTERACTIONS =
-            Dependency.newDependency(BooleanAssignmentList.class);
+    public static final Dependency<IInteractionFilter> EXCLUDE_INTERACTIONS =
+            Dependency.newDependency(IInteractionFilter.class);
+    public static final Dependency<IInteractionFilter> INCLUDE_INTERACTIONS =
+            Dependency.newDependency(IInteractionFilter.class);
 
     public static final Dependency<Integer> CONFIGURATION_LIMIT = Dependency.newDependency(Integer.class);
-    public static final Dependency<BooleanAssignmentList> INITIAL_SAMPLE =
+    public static final Dependency<BooleanAssignmentList> INITIAL_FIXED_SAMPLE =
+            Dependency.newDependency(BooleanAssignmentList.class);
+    public static final Dependency<BooleanAssignmentList> INITIAL_VARIABLE_SAMPLE =
             Dependency.newDependency(BooleanAssignmentList.class);
 
-    public static final Dependency<ModalImplicationGraph> MIG = Dependency.newDependency(ModalImplicationGraph.class);
+    public static final Dependency<Long> RANDOM_SEED = Dependency.newDependency(Long.class);
 
-    public static final Dependency<Boolean> ALLOW_CHANGE_TO_INITIAL_SAMPLE = Dependency.newDependency(Boolean.class);
-    public static final Dependency<Boolean> INITIAL_SAMPLE_COUNTS_TOWARDS_CONFIGURATION_LIMIT =
-            Dependency.newDependency(Boolean.class);
-
-    public ATWiseSampleComputation(IComputation<BooleanAssignmentList> clauseList, Object... computations) {
+    public ATWiseSampleComputation(IComputation<ICombinationSpecification> combinationSet, Object... computations) {
         super(
-                clauseList,
-                Computations.of(new BooleanAssignmentList((VariableMap) null)),
-                Computations.of(new IntegerList(1)),
-                Computations.of(new BooleanAssignmentList((VariableMap) null)),
+                combinationSet,
+                Computations.of(IInteractionFilter.of(false)),
+                Computations.of(IInteractionFilter.of(true)),
                 Computations.of(Integer.MAX_VALUE),
                 Computations.of(new BooleanAssignmentList((VariableMap) null)),
-                new MIGBuilder(clauseList),
-                Computations.of(Boolean.TRUE),
-                Computations.of(Boolean.TRUE),
+                Computations.of(new BooleanAssignmentList((VariableMap) null)),
+                Computations.of(1L),
                 computations);
     }
 
@@ -82,18 +73,18 @@ public abstract class ATWiseSampleComputation extends ASAT4JAnalysis<BooleanAssi
     }
 
     protected int maxSampleSize, variableCount;
-    protected boolean allowChangeToInitialSample, initialSampleCountsTowardsConfigurationLimit;
-    protected BooleanAssignmentList combinationSetList;
-    protected IntegerList tValues;
-    protected SampleListIndex interactionFilter;
 
-    protected SAT4JSolutionSolver solver;
+    protected ICombinationSpecification combinationSets;
+    protected IInteractionFilter excludeFilter;
+    protected IInteractionFilter includeFilter;
+
     protected VariableMap variableMap;
+
     protected Random random;
-    protected ModalImplicationGraph mig;
 
     // TODO change to SampleBitIndex
-    protected BooleanAssignmentList initialSample;
+    protected BooleanAssignmentList initialFixedSample;
+    protected BooleanAssignmentList initialVariableSample;
 
     @Override
     public final Result<BooleanAssignmentList> compute(List<Object> dependencyList, Progress progress) {
@@ -103,77 +94,21 @@ public abstract class ATWiseSampleComputation extends ASAT4JAnalysis<BooleanAssi
                     "Configuration limit must be greater than 0. Value was " + maxSampleSize);
         }
 
-        initialSample = INITIAL_SAMPLE.get(dependencyList);
+        initialFixedSample = INITIAL_FIXED_SAMPLE.get(dependencyList);
+        initialVariableSample = INITIAL_VARIABLE_SAMPLE.get(dependencyList);
 
         random = new Random(RANDOM_SEED.get(dependencyList));
 
-        allowChangeToInitialSample = ALLOW_CHANGE_TO_INITIAL_SAMPLE.get(dependencyList);
-        initialSampleCountsTowardsConfigurationLimit =
-                INITIAL_SAMPLE_COUNTS_TOWARDS_CONFIGURATION_LIMIT.get(dependencyList);
+        combinationSets = COMBINATION_SET.get(dependencyList);
 
-        variableMap = BOOLEAN_CLAUSE_LIST.get(dependencyList).getVariableMap();
+        variableMap = combinationSets.variableMap();
         variableCount = variableMap.getVariableCount();
 
-        combinationSetList = COMBINATION_SETS.get(dependencyList);
-        if (combinationSetList.isEmpty()) {
-            combinationSetList.adapt(variableMap);
-            combinationSetList.add(variableMap.getVariables());
-        }
-        int numberOfCombinationSets = combinationSetList.size();
-
-        interactionFilter =
-                new SampleListIndex(EXCLUDE_INTERACTIONS.get(dependencyList).getAll(), variableCount);
-
-        tValues = T.get(dependencyList);
-        if (tValues.size() < 1) {
-            throw new IllegalArgumentException("List of t values must contain at least one value. Was empty.");
-        }
-        if (tValues.size() > 1) {
-            if (tValues.size() != numberOfCombinationSets) {
-                throw new IllegalArgumentException(String.format(
-                        "Number of t values (%d) must be one or equal to number of combinations sets (%d).",
-                        tValues.size(), combinationSetList.size()));
-            }
-        } else {
-            int t = tValues.get(0);
-            for (int i = 1; i < numberOfCombinationSets; i++) {
-                tValues.addAll(t);
-            }
-        }
-
-        for (int i = 0; i < numberOfCombinationSets; i++) {
-            int t = tValues.get(i);
-            if (t < 1) {
-                throw new IllegalArgumentException(
-                        String.format("Value for t must be greater than 0. Value was %d.", +t));
-            }
-            BooleanAssignment variables = combinationSetList.get(i);
-            if (variables.size() < t) {
-                throw new IllegalArgumentException(String.format(
-                        "Value for t (%d) must be greater than number of variables (%d).", t, variables.size()));
-            }
-            for (int v : variables.get()) {
-                if (v <= 0) {
-                    throw new IllegalArgumentException(
-                            String.format("Variable ID must not be negative or zero. Was %d", v));
-                }
-            }
-        }
-
-        solver = createSolver(dependencyList);
-        solver.setSelectionStrategy(ISelectionStrategy.random(random));
-
-        if (initialSampleCountsTowardsConfigurationLimit) {
-            maxSampleSize = Math.max(maxSampleSize, maxSampleSize + initialSample.size());
-        }
+        excludeFilter = EXCLUDE_INTERACTIONS.get(dependencyList);
+        includeFilter = INCLUDE_INTERACTIONS.get(dependencyList);
 
         return computeSample(dependencyList, progress);
     }
 
     public abstract Result<BooleanAssignmentList> computeSample(List<Object> dependencyList, Progress progress);
-
-    @Override
-    protected SAT4JSolver newSolver(BooleanAssignmentList clauseList) {
-        return new SAT4JSolutionSolver(clauseList);
-    }
 }

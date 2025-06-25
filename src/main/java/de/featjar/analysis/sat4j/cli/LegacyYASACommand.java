@@ -56,7 +56,9 @@ public class LegacyYASACommand extends ATWiseCommand {
     public IComputation<BooleanAssignmentList> newTWiseAnalysis(
             OptionList optionParser, IComputation<BooleanAssignmentList> formula) {
         return formula.map(YASALegacy::new)
+                .set(YASALegacy.T, optionParser.get(T_OPTION))
                 .set(YASALegacy.ITERATIONS, optionParser.get(ITERATIONS_OPTION))
+                .set(YASALegacy.SAT_TIMEOUT, optionParser.get(SAT_TIMEOUT_OPTION))
                 .set(YASALegacy.INTERNAL_SOLUTION_LIMIT, optionParser.get(INTERNAL_SOLUTION_LIMIT));
     }
 

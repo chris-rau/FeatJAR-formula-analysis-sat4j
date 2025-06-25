@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import de.featjar.Common;
 import de.featjar.analysis.sat4j.computation.ComputeSolutionsSAT4J;
+import de.featjar.analysis.sat4j.computation.VariableCombinationSpecifictionComputation;
 import de.featjar.analysis.sat4j.computation.YASA;
 import de.featjar.analysis.sat4j.solver.ISelectionStrategy;
 import de.featjar.analysis.sat4j.twise.ConstraintedCoverageComputation;
@@ -35,7 +36,6 @@ import de.featjar.analysis.sat4j.twise.RelativeTWiseCoverageComputation;
 import de.featjar.base.FeatJAR;
 import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.IComputation;
-import de.featjar.base.data.IntegerList;
 import de.featjar.formula.assignment.BooleanAssignmentList;
 import de.featjar.formula.assignment.ComputeBooleanClauseList;
 import de.featjar.formula.computation.ComputeCNFFormula;
@@ -119,14 +119,14 @@ public class YASAIncrementalTest extends Common {
     }
 
     @Test
-    void gplWith3WiseCoverage48Configurations() {
-        testConfigurationLimit(loadFormula("GPL/model.xml"), 100, 48);
+    void gplWith3WiseCoverage46Configurations() {
+        testConfigurationLimit(loadFormula("GPL/model.xml"), 100, 46);
     }
 
     private void testTimeout(IFormula formula, int timeoutSeconds) {
         IComputation<BooleanAssignmentList> clauses = getClauses(formula);
         BooleanAssignmentList sample = clauses.map(YASA::new)
-                .set(YASA.T, new IntegerList(3))
+                .set(YASA.COMBINATION_SET, new VariableCombinationSpecifictionComputation(clauses, 3))
                 .set(YASA.ITERATIONS, Integer.MAX_VALUE)
                 .computeResult(Duration.ofSeconds(timeoutSeconds))
                 .orElseThrow();
@@ -141,7 +141,7 @@ public class YASAIncrementalTest extends Common {
     private void testConfigurationLimit(IFormula formula, int limit, int expectedSize) {
         IComputation<BooleanAssignmentList> clauses = getClauses(formula);
         BooleanAssignmentList sample = clauses.map(YASA::new)
-                .set(YASA.T, new IntegerList(3))
+                .set(YASA.COMBINATION_SET, new VariableCombinationSpecifictionComputation(clauses, 3))
                 .set(YASA.CONFIGURATION_LIMIT, limit)
                 .computeResult()
                 .orElseThrow();
@@ -190,8 +190,9 @@ public class YASAIncrementalTest extends Common {
     }
 
     private BooleanAssignmentList computeSample(int t, IComputation<BooleanAssignmentList> clauses) {
-        BooleanAssignmentList sample =
-                clauses.map(YASA::new).set(YASA.T, new IntegerList(t)).compute();
+        BooleanAssignmentList sample = clauses.map(YASA::new)
+                .set(YASA.COMBINATION_SET, new VariableCombinationSpecifictionComputation(clauses, t))
+                .compute();
         FeatJAR.log().info("Sample Size: %d", sample.size());
         return sample;
     }
@@ -201,7 +202,9 @@ public class YASAIncrementalTest extends Common {
         CoverageStatistic statistic = Computations.of(sample)
                 .map(RelativeTWiseCoverageComputation::new)
                 .set(RelativeTWiseCoverageComputation.REFERENCE_SAMPLE, clauses.map(ComputeSolutionsSAT4J::new))
-                .set(RelativeTWiseCoverageComputation.T, new IntegerList(t))
+                .set(
+                        RelativeTWiseCoverageComputation.COMBINATION_SET,
+                        new VariableCombinationSpecifictionComputation(clauses, t))
                 .compute();
         FeatJAR.log().info("Computed Coverage (RelativeTWiseCoverageComputation)");
         return statistic;
@@ -212,7 +215,9 @@ public class YASAIncrementalTest extends Common {
         CoverageStatistic statistic = Computations.of(sample)
                 .map(ConstraintedCoverageComputation::new)
                 .set(ConstraintedCoverageComputation.BOOLEAN_CLAUSE_LIST, clauses)
-                .set(ConstraintedCoverageComputation.T, new IntegerList(t))
+                .set(
+                        ConstraintedCoverageComputation.COMBINATION_SET,
+                        new VariableCombinationSpecifictionComputation(clauses, t))
                 .compute();
         FeatJAR.log().info("Computed Coverage (TWiseCoverageComputation)");
         return statistic;

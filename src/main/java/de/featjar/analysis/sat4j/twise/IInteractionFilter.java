@@ -20,26 +20,26 @@
  */
 package de.featjar.analysis.sat4j.twise;
 
-import de.featjar.base.computation.IComputation;
-import de.featjar.formula.assignment.BooleanAssignmentList;
+import de.featjar.formula.VariableMap;
 
 /**
- * Calculates statistics regarding t-wise feature coverage of a set of
- * solutions.
  *
  * @author Sebastian Krieter
  */
-public class AbsoluteTWiseCoverageComputation extends ATWiseCoverageComputation {
-    public AbsoluteTWiseCoverageComputation(IComputation<BooleanAssignmentList> sample) {
-        super(sample);
+public interface IInteractionFilter {
+
+    static IInteractionFilter of(boolean testResult) {
+        return new IInteractionFilter() {
+            @Override
+            public boolean test(int... literals) {
+                return testResult;
+            }
+        };
     }
 
-    public AbsoluteTWiseCoverageComputation(AbsoluteTWiseCoverageComputation other) {
-        super(other);
-    }
+    boolean test(int... literals);
 
-    @Override
-    protected void countUncovered(int[] uncoveredInteraction, CoverageStatistic statistic) {
-        statistic.incNumberOfUncoveredConditions();
+    default IInteractionFilter adapt(VariableMap variableMap) {
+        return this;
     }
 }

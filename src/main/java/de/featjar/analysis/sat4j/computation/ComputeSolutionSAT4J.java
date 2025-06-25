@@ -20,17 +20,26 @@
  */
 package de.featjar.analysis.sat4j.computation;
 
+import de.featjar.analysis.sat4j.solver.ISelectionStrategy;
+import de.featjar.analysis.sat4j.solver.ISelectionStrategy.Strategy;
+import de.featjar.analysis.sat4j.solver.SAT4JSolutionSolver;
+import de.featjar.base.computation.Computations;
+import de.featjar.base.computation.Dependency;
 import de.featjar.base.computation.IComputation;
 import de.featjar.base.computation.Progress;
 import de.featjar.base.data.Result;
 import de.featjar.formula.assignment.BooleanAssignmentList;
 import de.featjar.formula.assignment.BooleanSolution;
 import java.util.List;
+import java.util.Random;
 
 public class ComputeSolutionSAT4J extends ASAT4JAnalysis.Solution<BooleanSolution> {
 
+    public static final Dependency<ISelectionStrategy.Strategy> SELECTION_STRATEGY =
+            Dependency.newDependency(ISelectionStrategy.Strategy.class);
+
     public ComputeSolutionSAT4J(IComputation<BooleanAssignmentList> clauseList) {
-        super(clauseList);
+        super(clauseList, Computations.of(ISelectionStrategy.Strategy.ORIGINAL));
     }
 
     protected ComputeSolutionSAT4J(ComputeSolutionSAT4J other) {
@@ -39,6 +48,25 @@ public class ComputeSolutionSAT4J extends ASAT4JAnalysis.Solution<BooleanSolutio
 
     @Override
     public Result<BooleanSolution> compute(List<Object> dependencyList, Progress progress) {
-        return createSolver(dependencyList).findSolution();
+        SAT4JSolutionSolver solver = (SAT4JSolutionSolver) createSolver(dependencyList);
+        final Strategy strategy = SELECTION_STRATEGY.get(dependencyList);
+        switch (strategy) {
+            case FAST_RANDOM:
+                Random random = new Random(RANDOM_SEED.get(dependencyList));
+                solver.setSelectionStrategy(ISelectionStrategy.random(random));
+                solver.shuffleOrder(random);
+                break;
+            case NEGATIVE:
+                solver.setSelectionStrategy(ISelectionStrategy.negative());
+                break;
+            case ORIGINAL:
+                break;
+            case POSITIVE:
+                solver.setSelectionStrategy(ISelectionStrategy.positive());
+                break;
+            default:
+                break;
+        }
+        return solver.findSolution();
     }
 }

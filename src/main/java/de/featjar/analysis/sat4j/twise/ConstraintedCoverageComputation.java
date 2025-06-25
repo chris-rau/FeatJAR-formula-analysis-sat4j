@@ -22,6 +22,7 @@ package de.featjar.analysis.sat4j.twise;
 
 import de.featjar.analysis.RuntimeContradictionException;
 import de.featjar.analysis.RuntimeTimeoutException;
+import de.featjar.analysis.sat4j.computation.ICombinationSpecification;
 import de.featjar.analysis.sat4j.computation.MIGBuilder;
 import de.featjar.analysis.sat4j.solver.ISelectionStrategy;
 import de.featjar.analysis.sat4j.solver.MIGVisitorByte;
@@ -31,16 +32,15 @@ import de.featjar.analysis.sat4j.solver.SAT4JSolver;
 import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.Dependency;
 import de.featjar.base.computation.IComputation;
-import de.featjar.base.data.ICombination;
 import de.featjar.base.data.Result;
-import de.featjar.base.data.SingleLexicographicIterator;
 import de.featjar.formula.VariableMap;
 import de.featjar.formula.assignment.BooleanAssignment;
 import de.featjar.formula.assignment.BooleanAssignmentList;
 import java.time.Duration;
 import java.util.List;
 import java.util.Random;
-import java.util.stream.Stream;
+import java.util.function.BiConsumer;
+import java.util.function.Supplier;
 
 /**
  * Calculates statistics regarding t-wise feature coverage of a set of
@@ -105,8 +105,8 @@ public class ConstraintedCoverageComputation extends ATWiseCoverageComputation {
     }
 
     @Override
-    protected void initWithAdaptedVariableMap(List<Object> dependencyList) {
-        super.initWithAdaptedVariableMap(dependencyList);
+    protected void adaptVariableMap(List<Object> dependencyList) {
+        super.adaptVariableMap(dependencyList);
         Duration timeout = SAT_TIMEOUT.get(dependencyList);
 
         solver = new SAT4JSolutionSolver(clauseList);
@@ -114,7 +114,7 @@ public class ConstraintedCoverageComputation extends ATWiseCoverageComputation {
         solver.setSelectionStrategy(ISelectionStrategy.random(random));
         mig = new MIGBuilder(Computations.of(clauseList)).compute();
 
-        randomSampleIndex = new SampleBitIndex(sample.getVariableMap().getVariableCount());
+        randomSampleIndex = new SampleBitIndex(sample.getVariableMap());
     }
 
     private boolean isCombinationInvalidMIG(int[] literals) {
@@ -127,8 +127,12 @@ public class ConstraintedCoverageComputation extends ATWiseCoverageComputation {
         return false;
     }
 
-    protected Stream<ICombination<CoverageStatistic, int[]>> getCombinationStream(BooleanAssignment variables, int t) {
-        return SingleLexicographicIterator.stream(variables.get(), t, this::createStatistic);
+    @Override
+    protected void process(
+            ICombinationSpecification combinationSet,
+            BiConsumer<CoverageStatistic, int[]> consumer,
+            Supplier<CoverageStatistic> environmentCreator) {
+        combinationSet.forEach(consumer, environmentCreator);
     }
 
     @Override

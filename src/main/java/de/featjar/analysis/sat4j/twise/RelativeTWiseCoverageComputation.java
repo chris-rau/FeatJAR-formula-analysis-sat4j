@@ -66,10 +66,9 @@ public class RelativeTWiseCoverageComputation extends ATWiseCoverageComputation 
     }
 
     @Override
-    protected void initWithAdaptedVariableMap(List<Object> dependencyList) {
-        super.initWithAdaptedVariableMap(dependencyList);
-        referenceIndex = new SampleBitIndex(
-                referenceSample.getAll(), referenceSample.getVariableMap().getVariableCount());
+    protected void adaptVariableMap(List<Object> dependencyList) {
+        super.adaptVariableMap(dependencyList);
+        referenceIndex = new SampleBitIndex(referenceSample);
     }
 
     @Override

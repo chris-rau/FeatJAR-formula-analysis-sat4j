@@ -18,28 +18,31 @@
  *
  * See <https://github.com/FeatureIDE/FeatJAR-formula-analysis-sat4j> for further information.
  */
-package de.featjar.analysis.sat4j.twise;
+package de.featjar.analysis.sat4j.computation;
 
-import de.featjar.base.computation.IComputation;
-import de.featjar.formula.assignment.BooleanAssignmentList;
+import de.featjar.formula.VariableMap;
+import java.util.Random;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
-/**
- * Calculates statistics regarding t-wise feature coverage of a set of
- * solutions.
- *
- * @author Sebastian Krieter
- */
-public class AbsoluteTWiseCoverageComputation extends ATWiseCoverageComputation {
-    public AbsoluteTWiseCoverageComputation(IComputation<BooleanAssignmentList> sample) {
-        super(sample);
-    }
+public interface ICombinationSpecification {
 
-    public AbsoluteTWiseCoverageComputation(AbsoluteTWiseCoverageComputation other) {
-        super(other);
-    }
+    long loopCount();
 
-    @Override
-    protected void countUncovered(int[] uncoveredInteraction, CoverageStatistic statistic) {
-        statistic.incNumberOfUncoveredConditions();
-    }
+    void shuffleElements(Random random);
+
+    void adapt(VariableMap variableMap);
+
+    void forEach(Consumer<int[]> consumer);
+
+    <V> void forEach(BiConsumer<V, int[]> consumer, Supplier<V> environmentCreator);
+
+    <V> void forEachParallel(BiConsumer<V, int[]> consumer, Supplier<V> environmentCreator);
+
+    VariableMap variableMap();
+
+    int maxT();
+
+    ICombinationSpecification reduceTTo(int newT);
 }

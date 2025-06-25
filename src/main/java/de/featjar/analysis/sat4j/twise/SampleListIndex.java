@@ -22,6 +22,7 @@ package de.featjar.analysis.sat4j.twise;
 
 import de.featjar.base.data.ExpandableIntegerList;
 import de.featjar.formula.assignment.BooleanAssignment;
+import de.featjar.formula.assignment.BooleanAssignmentList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -31,34 +32,39 @@ import java.util.List;
  *
  * @author Sebastian Krieter
  */
-public class SampleListIndex {
+public class SampleListIndex implements ISampleIndex {
 
-    private final ExpandableIntegerList[] bitSetReference;
+    private final ExpandableIntegerList[] configurationIndices;
     private final int numberOfVariables;
     private int sampleSize;
 
     public SampleListIndex(final int numberOfVariables) {
         this.numberOfVariables = numberOfVariables;
-        bitSetReference = new ExpandableIntegerList[2 * numberOfVariables + 1];
+        configurationIndices = new ExpandableIntegerList[2 * numberOfVariables + 1];
 
         sampleSize = 0;
-        for (int j = 0; j < bitSetReference.length; j++) {
-            bitSetReference[j] = new ExpandableIntegerList();
+        for (int j = 0; j < configurationIndices.length; j++) {
+            configurationIndices[j] = new ExpandableIntegerList();
         }
     }
 
     public SampleListIndex(final int numberOfVariables, int numberOfInitialConfigs) {
         this.numberOfVariables = numberOfVariables;
-        bitSetReference = new ExpandableIntegerList[2 * numberOfVariables + 1];
+        configurationIndices = new ExpandableIntegerList[2 * numberOfVariables + 1];
 
         sampleSize = 0;
-        for (int j = 0; j < bitSetReference.length; j++) {
-            bitSetReference[j] = new ExpandableIntegerList(numberOfInitialConfigs);
+        for (int j = 0; j < configurationIndices.length; j++) {
+            configurationIndices[j] = new ExpandableIntegerList(numberOfInitialConfigs);
         }
     }
 
     public SampleListIndex(List<? extends BooleanAssignment> sample, final int numberOfVariables) {
         this(numberOfVariables, sample.size());
+        sample.forEach(this::addConfiguration);
+    }
+
+    public SampleListIndex(BooleanAssignmentList sample) {
+        this(sample.getVariableMap().getVariableCount(), sample.size());
         sample.forEach(this::addConfiguration);
     }
 
@@ -73,7 +79,7 @@ public class SampleListIndex {
         for (int i = 0; i < literals.length; i++) {
             final int literal = literals[i];
             if (literal != 0) {
-                bitSetReference[numberOfVariables + literal].add(configurationIndex);
+                configurationIndices[numberOfVariables + literal].add(configurationIndex);
             }
         }
     }
@@ -84,12 +90,12 @@ public class SampleListIndex {
 
     public int index(int... literals) {
         if (literals.length < 2) {
-            ExpandableIntegerList i0 = bitSetReference[numberOfVariables + literals[0]];
+            ExpandableIntegerList i0 = configurationIndices[numberOfVariables + literals[0]];
             return i0.isEmpty() ? -1 : i0.get(0);
         }
         ExpandableIntegerList[] selectedIndexedSolutions = new ExpandableIntegerList[literals.length];
         for (int i = 0; i < literals.length; i++) {
-            final ExpandableIntegerList indexedSolution = bitSetReference[numberOfVariables + literals[i]];
+            final ExpandableIntegerList indexedSolution = configurationIndices[numberOfVariables + literals[i]];
             if (indexedSolution.size() == 0) {
                 return -1;
             }
@@ -105,7 +111,7 @@ public class SampleListIndex {
             int id0 = ia0[i];
             for (int j = 1; j < literals.length; j++) {
                 final ExpandableIntegerList ij = selectedIndexedSolutions[j];
-                final int searchIndex = search(ij, searchIndices, id0, j);
+                final int searchIndex = search(ij, searchIndices[j - 1], id0);
                 if (searchIndex < 0) {
                     int nextIndex = -searchIndex - 1;
                     if (nextIndex < ij.size()) {
@@ -123,8 +129,13 @@ public class SampleListIndex {
         return -1;
     }
 
-    private int search(ExpandableIntegerList ij, final int[] searchIndices, int id0, int j) {
-        int minIndex = searchIndices[j - 1];
+    @Override
+    public int size(int... literals) {
+        // TODO implement exhaustive search
+        throw new UnsupportedOperationException();
+    }
+
+    private int search(ExpandableIntegerList ij, int minIndex, int id0) {
         int maxIndex = ij.size();
         int[] iax = ij.getInternalArray();
         if (maxIndex - minIndex < 8) {
@@ -144,5 +155,22 @@ public class SampleListIndex {
 
     public int size() {
         return sampleSize;
+    }
+
+    @Override
+    public int getNumberOfVariables() {
+        return numberOfVariables;
+    }
+
+    public int[] getConfiguration(int configurationID) {
+        int[] model = new int[numberOfVariables];
+        for (int l = 1; l <= numberOfVariables; l++) {
+            if (0 <= search(configurationIndices[numberOfVariables + l], 0, configurationID)) {
+                model[l - 1] = l;
+            } else if (0 <= search(configurationIndices[numberOfVariables - l], 0, configurationID)) {
+                model[l - 1] = -l;
+            }
+        }
+        return model;
     }
 }

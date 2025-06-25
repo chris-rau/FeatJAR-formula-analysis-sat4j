@@ -29,6 +29,8 @@ import de.featjar.Common;
 import de.featjar.analysis.sat4j.computation.ComputeAtomicSetsSAT4J;
 import de.featjar.analysis.sat4j.computation.ComputeCoreSAT4J;
 import de.featjar.analysis.sat4j.computation.ComputeSolutionsSAT4J;
+import de.featjar.analysis.sat4j.computation.VariableCombinationSet;
+import de.featjar.analysis.sat4j.computation.VariableCombinationSpecifictionComputation;
 import de.featjar.analysis.sat4j.computation.YASALegacy;
 import de.featjar.analysis.sat4j.solver.ISelectionStrategy;
 import de.featjar.analysis.sat4j.twise.ConstraintedCoverageComputation;
@@ -37,7 +39,6 @@ import de.featjar.analysis.sat4j.twise.RelativeTWiseCoverageComputation;
 import de.featjar.base.FeatJAR;
 import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.IComputation;
-import de.featjar.base.data.IntegerList;
 import de.featjar.formula.VariableMap;
 import de.featjar.formula.assignment.BooleanAssignment;
 import de.featjar.formula.assignment.BooleanAssignmentList;
@@ -121,7 +122,7 @@ public class YASALegacyTest extends Common {
     private void testTimeout(IFormula formula, int timeoutSeconds) {
         IComputation<BooleanAssignmentList> clauses = getClauses(formula);
         BooleanAssignmentList sample = clauses.map(YASALegacy::new)
-                .set(YASALegacy.T, new IntegerList(3))
+                .set(YASALegacy.T, 3)
                 .set(YASALegacy.ITERATIONS, Integer.MAX_VALUE)
                 .computeResult(Duration.ofSeconds(timeoutSeconds))
                 .orElseThrow();
@@ -186,9 +187,8 @@ public class YASALegacyTest extends Common {
     }
 
     private BooleanAssignmentList computeSample(int t, IComputation<BooleanAssignmentList> clauses) {
-        BooleanAssignmentList sample = clauses.map(YASALegacy::new)
-                .set(YASALegacy.T, new IntegerList(t))
-                .compute();
+        BooleanAssignmentList sample =
+                clauses.map(YASALegacy::new).set(YASALegacy.T, t).compute();
         FeatJAR.log().info("Sample Size: %d", sample.size());
         return sample;
     }
@@ -198,7 +198,9 @@ public class YASALegacyTest extends Common {
         CoverageStatistic statistic = Computations.of(sample)
                 .map(RelativeTWiseCoverageComputation::new)
                 .set(RelativeTWiseCoverageComputation.REFERENCE_SAMPLE, clauses.map(ComputeSolutionsSAT4J::new))
-                .set(RelativeTWiseCoverageComputation.T, new IntegerList(t))
+                .set(
+                        RelativeTWiseCoverageComputation.COMBINATION_SET,
+                        new VariableCombinationSpecifictionComputation(clauses, t))
                 .compute();
         FeatJAR.log().info("Computed Coverage (RelativeTWiseCoverageComputation)");
         return statistic;
@@ -209,7 +211,9 @@ public class YASALegacyTest extends Common {
         CoverageStatistic statistic = Computations.of(sample)
                 .map(RelativeTWiseCoverageComputation::new)
                 .set(RelativeTWiseCoverageComputation.REFERENCE_SAMPLE, clauses.map(ComputeSolutionsSAT4J::new))
-                .set(RelativeTWiseCoverageComputation.T, new IntegerList(t))
+                .set(
+                        RelativeTWiseCoverageComputation.COMBINATION_SET,
+                        new VariableCombinationSpecifictionComputation(clauses, t))
                 .compute();
         FeatJAR.log().info("Computed Coverage (RelativeTWiseCoverageComputation2)");
         return statistic;
@@ -220,7 +224,9 @@ public class YASALegacyTest extends Common {
         CoverageStatistic statistic = Computations.of(sample)
                 .map(ConstraintedCoverageComputation::new)
                 .set(ConstraintedCoverageComputation.BOOLEAN_CLAUSE_LIST, clauses)
-                .set(ConstraintedCoverageComputation.T, new IntegerList(t))
+                .set(
+                        ConstraintedCoverageComputation.COMBINATION_SET,
+                        new VariableCombinationSpecifictionComputation(clauses, t))
                 .compute();
         FeatJAR.log().info("Computed Coverage (TWiseCoverageComputation)");
         return statistic;
@@ -242,35 +248,33 @@ public class YASALegacyTest extends Common {
         CoverageStatistic statisticNone = Computations.of(sample)
                 .map(ConstraintedCoverageComputation::new)
                 .set(ConstraintedCoverageComputation.BOOLEAN_CLAUSE_LIST, clauses)
-                .set(ConstraintedCoverageComputation.T, new IntegerList(t))
+                .set(
+                        ConstraintedCoverageComputation.COMBINATION_SET,
+                        new VariableCombinationSpecifictionComputation(clauses, t))
                 .compute();
 
         CoverageStatistic statisticCore = Computations.of(sample)
                 .map(ConstraintedCoverageComputation::new)
                 .set(ConstraintedCoverageComputation.BOOLEAN_CLAUSE_LIST, clauses)
-                .set(ConstraintedCoverageComputation.T, new IntegerList(t))
                 .set(
-                        ConstraintedCoverageComputation.COMBINATION_SETS,
-                        new BooleanAssignmentList(variableMap, variables.removeAll(core)))
+                        ConstraintedCoverageComputation.COMBINATION_SET,
+                        new VariableCombinationSet(t, variables.removeAll(core), variableMap))
                 .compute();
 
         CoverageStatistic statisticAtomic = Computations.of(sample)
                 .map(ConstraintedCoverageComputation::new)
                 .set(ConstraintedCoverageComputation.BOOLEAN_CLAUSE_LIST, clauses)
-                .set(ConstraintedCoverageComputation.T, new IntegerList(t))
                 .set(
-                        ConstraintedCoverageComputation.COMBINATION_SETS,
-                        new BooleanAssignmentList(variableMap, variables.removeAll(atomic)))
+                        ConstraintedCoverageComputation.COMBINATION_SET,
+                        new VariableCombinationSet(t, variables.removeAll(atomic), variableMap))
                 .compute();
 
         CoverageStatistic statisticCoreAtomic = Computations.of(sample)
                 .map(ConstraintedCoverageComputation::new)
                 .set(ConstraintedCoverageComputation.BOOLEAN_CLAUSE_LIST, clauses)
-                .set(ConstraintedCoverageComputation.T, new IntegerList(t))
                 .set(
-                        ConstraintedCoverageComputation.COMBINATION_SETS,
-                        new BooleanAssignmentList(
-                                variableMap, variables.removeAll(core).removeAll(atomic)))
+                        ConstraintedCoverageComputation.COMBINATION_SET,
+                        new VariableCombinationSet(t, variables.removeAll(core).removeAll(atomic), variableMap))
                 .compute();
         FeatJAR.log().info("Coverage statisticNone: %f", statisticNone.coverage());
         FeatJAR.log().info("Coverage statisticCore: %f", statisticCore.coverage());

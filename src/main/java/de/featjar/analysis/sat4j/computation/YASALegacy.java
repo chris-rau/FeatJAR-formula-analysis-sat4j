@@ -23,8 +23,11 @@ package de.featjar.analysis.sat4j.computation;
 import de.featjar.analysis.RuntimeContradictionException;
 import de.featjar.analysis.RuntimeTimeoutException;
 import de.featjar.analysis.sat4j.solver.IMIGVisitor;
+import de.featjar.analysis.sat4j.solver.ISelectionStrategy;
 import de.featjar.analysis.sat4j.solver.MIGVisitorInt;
 import de.featjar.analysis.sat4j.solver.ModalImplicationGraph;
+import de.featjar.analysis.sat4j.solver.SAT4JSolutionSolver;
+import de.featjar.analysis.sat4j.solver.SAT4JSolver;
 import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.Dependency;
 import de.featjar.base.computation.IComputation;
@@ -33,6 +36,7 @@ import de.featjar.base.data.BinomialCalculator;
 import de.featjar.base.data.ExpandableIntegerList;
 import de.featjar.base.data.Result;
 import de.featjar.base.data.SingleLexicographicIterator;
+import de.featjar.formula.VariableMap;
 import de.featjar.formula.assignment.BooleanAssignment;
 import de.featjar.formula.assignment.BooleanAssignmentList;
 import de.featjar.formula.assignment.BooleanClause;
@@ -43,6 +47,7 @@ import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 
 /**
  * YASA sampling algorithm. Generates configurations for a given propositional
@@ -50,13 +55,39 @@ import java.util.List;
  *
  * @author Sebastian Krieter
  */
-public class YASALegacy extends ATWiseSampleComputation {
+public class YASALegacy extends ASAT4JAnalysis<BooleanAssignmentList> {
+
+    public static final Dependency<BooleanAssignment> VARIABLES = Dependency.newDependency(BooleanAssignment.class);
+
+    public static final Dependency<Integer> T = Dependency.newDependency(Integer.class);
+
+    public static final Dependency<Integer> CONFIGURATION_LIMIT = Dependency.newDependency(Integer.class);
+    public static final Dependency<BooleanAssignmentList> INITIAL_SAMPLE =
+            Dependency.newDependency(BooleanAssignmentList.class);
+
+    public static final Dependency<ModalImplicationGraph> MIG = Dependency.newDependency(ModalImplicationGraph.class);
+
+    public static final Dependency<Boolean> ALLOW_CHANGE_TO_INITIAL_SAMPLE = Dependency.newDependency(Boolean.class);
+    public static final Dependency<Boolean> INITIAL_SAMPLE_COUNTS_TOWARDS_CONFIGURATION_LIMIT =
+            Dependency.newDependency(Boolean.class);
 
     public static final Dependency<Integer> ITERATIONS = Dependency.newDependency(Integer.class);
     public static final Dependency<Integer> INTERNAL_SOLUTION_LIMIT = Dependency.newDependency(Integer.class);
 
     public YASALegacy(IComputation<BooleanAssignmentList> clauseList) {
-        super(clauseList, Computations.of(1), Computations.of(100_000));
+        super(
+                clauseList,
+                clauseList.flatMapResult(YASALegacy.class, "variables", l -> {
+                    return Result.of(l.getVariableMap().getVariables());
+                }),
+                Computations.of(2),
+                Computations.of(Integer.MAX_VALUE),
+                Computations.of(new BooleanAssignmentList((VariableMap) null)),
+                new MIGBuilder(clauseList),
+                Computations.of(Boolean.TRUE),
+                Computations.of(Boolean.TRUE),
+                Computations.of(1),
+                Computations.of(100_000));
     }
 
     protected YASALegacy(YASALegacy other) {
@@ -174,8 +205,47 @@ public class YASALegacy extends ATWiseSampleComputation {
     private int curSolutionId;
     private boolean overLimit;
 
+    protected int maxSampleSize, variableCount;
+    protected boolean allowChangeToInitialSample, initialSampleCountsTowardsConfigurationLimit;
+
+    protected BooleanAssignment variables;
+
+    protected SAT4JSolutionSolver solver;
+    protected VariableMap variableMap;
+    protected Random random;
+    protected ModalImplicationGraph mig;
+
+    // TODO change to SampleBitIndex
+    protected BooleanAssignmentList initialSample;
+
     @Override
-    public Result<BooleanAssignmentList> computeSample(List<Object> dependencyList, Progress progress) {
+    public final Result<BooleanAssignmentList> compute(List<Object> dependencyList, Progress progress) {
+        maxSampleSize = CONFIGURATION_LIMIT.get(dependencyList);
+        if (maxSampleSize < 0) {
+            throw new IllegalArgumentException(
+                    "Configuration limit must be greater than 0. Value was " + maxSampleSize);
+        }
+
+        initialSample = INITIAL_SAMPLE.get(dependencyList);
+
+        random = new Random(RANDOM_SEED.get(dependencyList));
+
+        allowChangeToInitialSample = ALLOW_CHANGE_TO_INITIAL_SAMPLE.get(dependencyList);
+        initialSampleCountsTowardsConfigurationLimit =
+                INITIAL_SAMPLE_COUNTS_TOWARDS_CONFIGURATION_LIMIT.get(dependencyList);
+
+        variableMap = BOOLEAN_CLAUSE_LIST.get(dependencyList).getVariableMap();
+        variableCount = variableMap.getVariableCount();
+
+        variables = VARIABLES.get(dependencyList);
+
+        solver = createSolver(dependencyList);
+        solver.setSelectionStrategy(ISelectionStrategy.random(random));
+
+        if (initialSampleCountsTowardsConfigurationLimit) {
+            maxSampleSize = Math.max(maxSampleSize, maxSampleSize + initialSample.size());
+        }
+
         iterations = ITERATIONS.get(dependencyList);
         if (iterations == 0) {
             throw new IllegalArgumentException("Iterations must not equal 0.");
@@ -194,12 +264,10 @@ public class YASALegacy extends ATWiseSampleComputation {
 
         mig = MIG.get(dependencyList);
 
-        t = tValues.get(0);
-        BooleanAssignment variables = new BooleanAssignment(combinationSetList
-                .get(0)
-                .removeAllVariables(Arrays.stream(mig.getCore()).map(Math::abs).toArray()));
-        int[] addAll = variables.addAll(variables.negate());
-        literals = new BooleanAssignment(addAll);
+        t = T.get(dependencyList);
+        BooleanAssignment filteredVariables = new BooleanAssignment(variables.removeAllVariables(
+                Arrays.stream(mig.getCore()).map(Math::abs).toArray()));
+        literals = new BooleanAssignment(filteredVariables.addAll(filteredVariables.negate()));
 
         progress.setTotalSteps(iterations * BinomialCalculator.computeBinomial(literals.size(), t));
 
@@ -707,6 +775,11 @@ public class YASALegacy extends ATWiseSampleComputation {
             solver.getAssignment().clear(orgAssignmentSize);
         }
         return false;
+    }
+
+    @Override
+    protected SAT4JSolver newSolver(BooleanAssignmentList clauseList) {
+        return new SAT4JSolutionSolver(clauseList);
     }
 
     private BooleanSolution addSolverSolution() {
