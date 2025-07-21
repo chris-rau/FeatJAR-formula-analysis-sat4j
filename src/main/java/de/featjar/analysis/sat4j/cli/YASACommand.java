@@ -20,18 +20,17 @@
  */
 package de.featjar.analysis.sat4j.cli;
 
-import de.featjar.analysis.sat4j.computation.VariableCombinationSpecifictionComputation;
 import de.featjar.analysis.sat4j.computation.YASA;
-import de.featjar.analysis.sat4j.twise.SampleBitIndex;
 import de.featjar.base.cli.Option;
 import de.featjar.base.cli.OptionList;
-import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.IComputation;
 import de.featjar.base.data.Result;
 import de.featjar.base.io.IO;
 import de.featjar.base.log.Log.Verbosity;
 import de.featjar.formula.assignment.BooleanAssignmentGroups;
 import de.featjar.formula.assignment.BooleanAssignmentList;
+import de.featjar.formula.combination.VariableCombinationSpecification.VariableCombinationSpecificationComputation;
+import de.featjar.formula.index.SampleBitIndex;
 import de.featjar.formula.io.BooleanAssignmentGroupsFormats;
 import java.nio.file.Path;
 import java.util.Optional;
@@ -77,8 +76,8 @@ public class YASACommand extends ATWiseCommand {
         IComputation<BooleanAssignmentList> analysis = formula.map(YASA::new)
                 .set(
                         YASA.COMBINATION_SET,
-                        new VariableCombinationSpecifictionComputation(
-                                formula, Computations.of(optionParser.get(T_OPTION))))
+                        formula.map(VariableCombinationSpecificationComputation::new)
+                                .set(VariableCombinationSpecificationComputation.T, optionParser.get(T_OPTION)))
                 .set(YASA.SAT_TIMEOUT, optionParser.get(SAT_TIMEOUT_OPTION))
                 .set(YASA.ITERATIONS, optionParser.get(ITERATIONS_OPTION))
                 .set(YASA.INTERNAL_SOLUTION_LIMIT, optionParser.get(INTERNAL_SOLUTION_LIMIT))

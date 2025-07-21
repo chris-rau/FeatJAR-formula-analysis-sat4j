@@ -21,13 +21,7 @@
 package de.featjar.analysis.sat4j.cli;
 
 import de.featjar.analysis.AAnalysisCommand;
-import de.featjar.analysis.sat4j.computation.VariableCombinationSpecifictionComputation;
-import de.featjar.analysis.sat4j.twise.ATWiseCoverageComputation;
-import de.featjar.analysis.sat4j.twise.AbsoluteTWiseCoverageComputation;
-import de.featjar.analysis.sat4j.twise.ConstraintedCoverageComputation;
-import de.featjar.analysis.sat4j.twise.CoverageStatistic;
-import de.featjar.analysis.sat4j.twise.RelativeTWiseCoverageComputation;
-import de.featjar.analysis.sat4j.twise.SampleBitIndex;
+import de.featjar.analysis.sat4j.computation.ComputeConstraintedTWiseCoverage;
 import de.featjar.base.cli.Option;
 import de.featjar.base.cli.OptionList;
 import de.featjar.base.computation.Computations;
@@ -37,11 +31,17 @@ import de.featjar.base.io.IO;
 import de.featjar.base.io.format.IFormat;
 import de.featjar.base.io.text.StringTextFormat;
 import de.featjar.base.log.Log.Verbosity;
+import de.featjar.formula.CoverageStatistic;
 import de.featjar.formula.assignment.BooleanAssignmentGroups;
 import de.featjar.formula.assignment.BooleanAssignmentList;
 import de.featjar.formula.assignment.ComputeBooleanClauseList;
+import de.featjar.formula.combination.VariableCombinationSpecification.VariableCombinationSpecificationComputation;
+import de.featjar.formula.computation.AComputeTWiseCoverage;
+import de.featjar.formula.computation.ComputeAbsoluteTWiseCoverage;
 import de.featjar.formula.computation.ComputeCNFFormula;
 import de.featjar.formula.computation.ComputeNNFFormula;
+import de.featjar.formula.computation.ComputeRelativeTWiseCoverage;
+import de.featjar.formula.index.SampleBitIndex;
 import de.featjar.formula.io.BooleanAssignmentGroupsFormats;
 import de.featjar.formula.io.FormulaFormats;
 import java.nio.file.Path;
@@ -131,8 +131,9 @@ public class TWiseCoverageCommand extends AAnalysisCommand<CoverageStatistic> {
         } else {
             coverageComputation = computeAbsoluteCoverage(sample);
             coverageComputation.set(
-                    ATWiseCoverageComputation.COMBINATION_SET,
-                    new VariableCombinationSpecifictionComputation(sample, Computations.of(t)));
+                    AComputeTWiseCoverage.COMBINATION_SET,
+                    sample.map(VariableCombinationSpecificationComputation::new)
+                            .set(VariableCombinationSpecificationComputation.T, t));
         }
 
         Result<Path> consideredInteractionsPath = optionParser.getResult(INCLUDE_INTERACTIONS);
@@ -142,7 +143,7 @@ public class TWiseCoverageCommand extends AAnalysisCommand<CoverageStatistic> {
                     .orElseLog(Verbosity.WARNING);
             if (consideredInteractions != null) {
                 coverageComputation.set(
-                        ATWiseCoverageComputation.INCLUDE_INTERACTIONS,
+                        AComputeTWiseCoverage.INCLUDE_INTERACTIONS,
                         new SampleBitIndex(consideredInteractions.getMergedGroups()));
             }
         }
@@ -153,7 +154,7 @@ public class TWiseCoverageCommand extends AAnalysisCommand<CoverageStatistic> {
                     .orElseLog(Verbosity.WARNING);
             if (ignoreInteractions != null) {
                 coverageComputation.set(
-                        ATWiseCoverageComputation.EXCLUDE_INTERACTIONS,
+                        AComputeTWiseCoverage.EXCLUDE_INTERACTIONS,
                         new SampleBitIndex(ignoreInteractions.getMergedGroups()));
             }
         }
@@ -162,7 +163,7 @@ public class TWiseCoverageCommand extends AAnalysisCommand<CoverageStatistic> {
     }
 
     private IComputation<CoverageStatistic> computeAbsoluteCoverage(IComputation<BooleanAssignmentList> sample) {
-        return sample.map(AbsoluteTWiseCoverageComputation::new);
+        return sample.map(ComputeAbsoluteTWiseCoverage::new);
     }
 
     private IComputation<CoverageStatistic> computeRelativeCoverage(
@@ -171,11 +172,11 @@ public class TWiseCoverageCommand extends AAnalysisCommand<CoverageStatistic> {
                 .map(BooleanAssignmentGroups::getFirstGroup)
                 .orElseThrow();
 
-        return sample.map(RelativeTWiseCoverageComputation::new)
-                .set(RelativeTWiseCoverageComputation.REFERENCE_SAMPLE, referenceSample)
+        return sample.map(ComputeRelativeTWiseCoverage::new)
+                .set(ComputeRelativeTWiseCoverage.REFERENCE_SAMPLE, referenceSample)
                 .set(
-                        RelativeTWiseCoverageComputation.COMBINATION_SET,
-                        new VariableCombinationSpecifictionComputation(
+                        ComputeRelativeTWiseCoverage.COMBINATION_SET,
+                        new VariableCombinationSpecificationComputation(
                                 Computations.of(referenceSample), Computations.of(t)));
     }
 
@@ -191,11 +192,11 @@ public class TWiseCoverageCommand extends AAnalysisCommand<CoverageStatistic> {
                         .map(ComputeBooleanClauseList::new))
                 .computeResult()
                 .orElseThrow();
-        return sample.map(ConstraintedCoverageComputation::new)
-                .set(ConstraintedCoverageComputation.BOOLEAN_CLAUSE_LIST, formula)
+        return sample.map(ComputeConstraintedTWiseCoverage::new)
+                .set(ComputeConstraintedTWiseCoverage.BOOLEAN_CLAUSE_LIST, formula)
                 .set(
-                        ATWiseCoverageComputation.COMBINATION_SET,
-                        new VariableCombinationSpecifictionComputation(Computations.of(formula), Computations.of(t)));
+                        AComputeTWiseCoverage.COMBINATION_SET,
+                        new VariableCombinationSpecificationComputation(Computations.of(formula), Computations.of(t)));
     }
 
     @Override

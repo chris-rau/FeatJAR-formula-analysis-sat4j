@@ -29,7 +29,6 @@ import de.featjar.analysis.sat4j.solver.ModalImplicationGraph;
 import de.featjar.analysis.sat4j.solver.SAT4JAssignment;
 import de.featjar.analysis.sat4j.solver.SAT4JSolutionSolver;
 import de.featjar.analysis.sat4j.solver.SAT4JSolver;
-import de.featjar.analysis.sat4j.twise.SampleBitIndex;
 import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.Dependency;
 import de.featjar.base.computation.IComputation;
@@ -38,6 +37,8 @@ import de.featjar.base.data.Result;
 import de.featjar.formula.assignment.BooleanAssignment;
 import de.featjar.formula.assignment.BooleanAssignmentList;
 import de.featjar.formula.assignment.BooleanSolution;
+import de.featjar.formula.combination.VariableCombinationSpecification.VariableCombinationSpecificationComputation;
+import de.featjar.formula.index.SampleBitIndex;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.BitSet;
@@ -97,7 +98,7 @@ public class YASA extends ATWiseSampleComputation {
 
     public YASA(IComputation<BooleanAssignmentList> clauseList) {
         super(
-                new VariableCombinationSpecifictionComputation(clauseList, Computations.of(1)),
+                clauseList.map(VariableCombinationSpecificationComputation::new),
                 clauseList,
                 Computations.of(new BooleanAssignment()),
                 Computations.of(new BooleanAssignmentList(null, 0)),

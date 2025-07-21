@@ -20,7 +20,6 @@
  */
 package de.featjar.analysis.sat4j.computation;
 
-import de.featjar.analysis.sat4j.twise.IInteractionFilter;
 import de.featjar.base.computation.AComputation;
 import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.Dependency;
@@ -29,6 +28,8 @@ import de.featjar.base.computation.Progress;
 import de.featjar.base.data.Result;
 import de.featjar.formula.VariableMap;
 import de.featjar.formula.assignment.BooleanAssignmentList;
+import de.featjar.formula.combination.ICombinationFilter;
+import de.featjar.formula.combination.ICombinationSpecification;
 import java.util.List;
 import java.util.Random;
 
@@ -43,10 +44,10 @@ public abstract class ATWiseSampleComputation extends AComputation<BooleanAssign
     public static final Dependency<ICombinationSpecification> COMBINATION_SET =
             Dependency.newDependency(ICombinationSpecification.class);
 
-    public static final Dependency<IInteractionFilter> EXCLUDE_INTERACTIONS =
-            Dependency.newDependency(IInteractionFilter.class);
-    public static final Dependency<IInteractionFilter> INCLUDE_INTERACTIONS =
-            Dependency.newDependency(IInteractionFilter.class);
+    public static final Dependency<ICombinationFilter> EXCLUDE_INTERACTIONS =
+            Dependency.newDependency(ICombinationFilter.class);
+    public static final Dependency<ICombinationFilter> INCLUDE_INTERACTIONS =
+            Dependency.newDependency(ICombinationFilter.class);
 
     public static final Dependency<Integer> CONFIGURATION_LIMIT = Dependency.newDependency(Integer.class);
     public static final Dependency<BooleanAssignmentList> INITIAL_FIXED_SAMPLE =
@@ -59,8 +60,8 @@ public abstract class ATWiseSampleComputation extends AComputation<BooleanAssign
     public ATWiseSampleComputation(IComputation<ICombinationSpecification> combinationSet, Object... computations) {
         super(
                 combinationSet,
-                Computations.of(IInteractionFilter.of(false)),
-                Computations.of(IInteractionFilter.of(true)),
+                Computations.of(ICombinationFilter.of(false)),
+                Computations.of(ICombinationFilter.of(true)),
                 Computations.of(Integer.MAX_VALUE),
                 Computations.of(new BooleanAssignmentList((VariableMap) null)),
                 Computations.of(new BooleanAssignmentList((VariableMap) null)),
@@ -75,8 +76,8 @@ public abstract class ATWiseSampleComputation extends AComputation<BooleanAssign
     protected int maxSampleSize, variableCount;
 
     protected ICombinationSpecification combinationSets;
-    protected IInteractionFilter excludeFilter;
-    protected IInteractionFilter includeFilter;
+    protected ICombinationFilter excludeFilter;
+    protected ICombinationFilter includeFilter;
 
     protected VariableMap variableMap;
 

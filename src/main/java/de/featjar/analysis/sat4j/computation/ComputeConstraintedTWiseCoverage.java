@@ -18,12 +18,10 @@
  *
  * See <https://github.com/FeatureIDE/FeatJAR-formula-analysis-sat4j> for further information.
  */
-package de.featjar.analysis.sat4j.twise;
+package de.featjar.analysis.sat4j.computation;
 
 import de.featjar.analysis.RuntimeContradictionException;
 import de.featjar.analysis.RuntimeTimeoutException;
-import de.featjar.analysis.sat4j.computation.ICombinationSpecification;
-import de.featjar.analysis.sat4j.computation.MIGBuilder;
 import de.featjar.analysis.sat4j.solver.ISelectionStrategy;
 import de.featjar.analysis.sat4j.solver.MIGVisitorByte;
 import de.featjar.analysis.sat4j.solver.ModalImplicationGraph;
@@ -33,9 +31,13 @@ import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.Dependency;
 import de.featjar.base.computation.IComputation;
 import de.featjar.base.data.Result;
+import de.featjar.formula.CoverageStatistic;
 import de.featjar.formula.VariableMap;
 import de.featjar.formula.assignment.BooleanAssignment;
 import de.featjar.formula.assignment.BooleanAssignmentList;
+import de.featjar.formula.combination.ICombinationSpecification;
+import de.featjar.formula.computation.AComputeTWiseCoverage;
+import de.featjar.formula.index.SampleBitIndex;
 import java.time.Duration;
 import java.util.List;
 import java.util.Random;
@@ -48,7 +50,7 @@ import java.util.function.Supplier;
  *
  * @author Sebastian Krieter
  */
-public class ConstraintedCoverageComputation extends ATWiseCoverageComputation {
+public class ComputeConstraintedTWiseCoverage extends AComputeTWiseCoverage {
 
     public static final Dependency<BooleanAssignmentList> BOOLEAN_CLAUSE_LIST =
             Dependency.newDependency(BooleanAssignmentList.class);
@@ -59,7 +61,7 @@ public class ConstraintedCoverageComputation extends ATWiseCoverageComputation {
     public static final Dependency<Duration> SAT_TIMEOUT = Dependency.newDependency(Duration.class);
     public static final Dependency<Long> RANDOM_SEED = Dependency.newDependency(Long.class);
 
-    public ConstraintedCoverageComputation(IComputation<BooleanAssignmentList> sample) {
+    public ComputeConstraintedTWiseCoverage(IComputation<BooleanAssignmentList> sample) {
         super(
                 sample,
                 Computations.of(new BooleanAssignmentList(null, 0)),
@@ -69,7 +71,7 @@ public class ConstraintedCoverageComputation extends ATWiseCoverageComputation {
                 Computations.of(1L));
     }
 
-    public ConstraintedCoverageComputation(ConstraintedCoverageComputation other) {
+    public ComputeConstraintedTWiseCoverage(ComputeConstraintedTWiseCoverage other) {
         super(other);
     }
 
@@ -138,9 +140,9 @@ public class ConstraintedCoverageComputation extends ATWiseCoverageComputation {
     @Override
     protected void countUncovered(int[] uncoveredInteraction, CoverageStatistic statistic) {
         if (randomSampleIndex.test(uncoveredInteraction)) {
-            statistic.incNumberOfUncoveredConditions();
+            statistic.incNumberOfUncoveredElements();
         } else if (isCombinationInvalidMIG(uncoveredInteraction)) {
-            statistic.incNumberOfInvalidConditions();
+            statistic.incNumberOfInvalidElements();
         } else {
             int orgAssignmentSize = solver.getAssignment().size();
             solver.getAssignment().addAll(uncoveredInteraction);
@@ -151,9 +153,9 @@ public class ConstraintedCoverageComputation extends ATWiseCoverageComputation {
                         int[] solution = solver.getInternalSolution();
                         randomSampleIndex.addConfiguration(solution);
                         solver.shuffleOrder(random);
-                        statistic.incNumberOfUncoveredConditions();
+                        statistic.incNumberOfUncoveredElements();
                     } else {
-                        statistic.incNumberOfInvalidConditions();
+                        statistic.incNumberOfInvalidElements();
                     }
                 } else {
                     throw new RuntimeTimeoutException();
