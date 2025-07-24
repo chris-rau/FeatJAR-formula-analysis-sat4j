@@ -29,7 +29,7 @@ import de.featjar.Common;
 import de.featjar.analysis.sat4j.computation.ComputeAtomicSetsSAT4J;
 import de.featjar.analysis.sat4j.computation.ComputeCoreSAT4J;
 import de.featjar.analysis.sat4j.computation.ComputeSolutionsSAT4J;
-import de.featjar.analysis.sat4j.computation.VariableCombinationSet;
+import de.featjar.analysis.sat4j.computation.VariableCombinationSpecification;
 import de.featjar.analysis.sat4j.computation.VariableCombinationSpecifictionComputation;
 import de.featjar.analysis.sat4j.computation.YASALegacy;
 import de.featjar.analysis.sat4j.solver.ISelectionStrategy;
@@ -258,7 +258,7 @@ public class YASALegacyTest extends Common {
                 .set(ConstraintedCoverageComputation.BOOLEAN_CLAUSE_LIST, clauses)
                 .set(
                         ConstraintedCoverageComputation.COMBINATION_SET,
-                        new VariableCombinationSet(t, variables.removeAll(core), variableMap))
+                        new VariableCombinationSpecification(t, variables.removeAll(core), variableMap))
                 .compute();
 
         CoverageStatistic statisticAtomic = Computations.of(sample)
@@ -266,7 +266,7 @@ public class YASALegacyTest extends Common {
                 .set(ConstraintedCoverageComputation.BOOLEAN_CLAUSE_LIST, clauses)
                 .set(
                         ConstraintedCoverageComputation.COMBINATION_SET,
-                        new VariableCombinationSet(t, variables.removeAll(atomic), variableMap))
+                        new VariableCombinationSpecification(t, variables.removeAll(atomic), variableMap))
                 .compute();
 
         CoverageStatistic statisticCoreAtomic = Computations.of(sample)
@@ -274,7 +274,7 @@ public class YASALegacyTest extends Common {
                 .set(ConstraintedCoverageComputation.BOOLEAN_CLAUSE_LIST, clauses)
                 .set(
                         ConstraintedCoverageComputation.COMBINATION_SET,
-                        new VariableCombinationSet(t, variables.removeAll(core).removeAll(atomic), variableMap))
+                        new VariableCombinationSpecification(t, variables.removeAll(core).removeAll(atomic), variableMap))
                 .compute();
         FeatJAR.log().info("Coverage statisticNone: %f", statisticNone.coverage());
         FeatJAR.log().info("Coverage statisticCore: %f", statisticCore.coverage());

@@ -43,6 +43,7 @@ public abstract class AMultiCombinationSpecification implements ICombinationSpec
         setElements(elementSets, variableMap);
     }
 
+
     public int[] t() {
         return tValues;
     }

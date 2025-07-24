@@ -21,6 +21,8 @@
 package de.featjar.analysis.sat4j.computation;
 
 import de.featjar.formula.VariableMap;
+import de.featjar.formula.assignment.BooleanAssignment;
+
 import java.util.List;
 import java.util.Random;
 import java.util.function.BiConsumer;
@@ -56,6 +58,7 @@ public class MultiCombinationSpecification implements ICombinationSpecification 
     public void adapt(VariableMap variableMap) {
         for (ICombinationSpecification combinationSet : combinationSets) {
             combinationSet.adapt(variableMap);
+
         }
     }
 

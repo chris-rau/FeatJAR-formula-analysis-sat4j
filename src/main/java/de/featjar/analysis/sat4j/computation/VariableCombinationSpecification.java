@@ -30,21 +30,21 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
-public class VariableCombinationSet extends ACombinationSpecification {
+public class VariableCombinationSpecification extends ACombinationSpecification {
 
-    public VariableCombinationSet(int t, VariableMap variableMap) {
+    public VariableCombinationSpecification(int t, VariableMap variableMap) {
         super(variableMap.getVariables().get(), t, variableMap);
     }
 
-    public VariableCombinationSet(int t, BooleanAssignment variables, VariableMap variableMap) {
+    public VariableCombinationSpecification(int t, BooleanAssignment variables, VariableMap variableMap) {
         super(IntStream.of(variables.get()).map(Math::abs).distinct().toArray(), t, variableMap);
     }
 
-    public VariableCombinationSet(int t, int[] variables, VariableMap variableMap) {
+    public VariableCombinationSpecification(int t, int[] variables, VariableMap variableMap) {
         super(IntStream.of(variables).map(Math::abs).distinct().toArray(), t, variableMap);
     }
 
-    public VariableCombinationSet(int t) {
+    public VariableCombinationSpecification(int t) {
         super(t);
     }
 
@@ -91,6 +91,6 @@ public class VariableCombinationSet extends ACombinationSpecification {
 
     @Override
     public ICombinationSpecification reduceTTo(int newT) {
-        return new VariableCombinationSet(newT, elements, variableMap);
+        return new VariableCombinationSpecification(newT, elements, variableMap);
     }
 }

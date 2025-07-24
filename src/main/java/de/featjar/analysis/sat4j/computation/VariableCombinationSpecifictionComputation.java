@@ -56,6 +56,6 @@ public class VariableCombinationSpecifictionComputation extends AComputation<ICo
     @Override
     public Result<ICombinationSpecification> compute(List<Object> dependencyList, Progress progress) {
         VariableMap variableMap = BOOLEAN_CLAUSE_LIST.get(dependencyList).getVariableMap();
-        return Result.of(new VariableCombinationSet(T.get(dependencyList), variableMap.getVariables(), variableMap));
+        return Result.of(new VariableCombinationSpecification(T.get(dependencyList), variableMap.getVariables(), variableMap));
     }
 }

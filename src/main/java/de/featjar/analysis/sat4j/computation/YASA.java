@@ -105,7 +105,7 @@ public class YASA extends ATWiseSampleComputation {
                 new MIGBuilder(clauseList),
                 Computations.of(1),
                 Computations.of(65_536),
-                Computations.of(Boolean.TRUE));
+                Computations.of(Boolean.FALSE));
     }
 
     private int iterations, randomConfigurationLimit, curSolutionId, randomSampleIdsIndex;
