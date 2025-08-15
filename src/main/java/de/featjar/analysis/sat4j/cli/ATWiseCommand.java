@@ -31,7 +31,7 @@ import de.featjar.base.log.Log.Verbosity;
 import de.featjar.formula.assignment.BooleanAssignmentGroups;
 import de.featjar.formula.assignment.BooleanAssignmentList;
 import de.featjar.formula.io.BooleanAssignmentGroupsFormats;
-import de.featjar.formula.io.csv.BooleanSolutionListCSVFormat;
+import de.featjar.formula.io.dimacs.BooleanAssignmentGroupsDimacsFormat;
 import java.nio.file.Path;
 
 /**
@@ -39,7 +39,7 @@ import java.nio.file.Path;
  *
  * @author Sebastian Krieter
  */
-public abstract class ATWiseCommand extends ASAT4JAnalysisCommand<BooleanAssignmentList, BooleanAssignmentList> {
+public abstract class ATWiseCommand extends ASAT4JAnalysisCommand<BooleanAssignmentGroups> {
 
     /**
      * Value of t.
@@ -70,8 +70,13 @@ public abstract class ATWiseCommand extends ASAT4JAnalysisCommand<BooleanAssignm
             .setDescription("Path to initial variable sample file. Configurations in this sample can be modified.")
             .setValidator(Option.PathValidator);
 
+    public static final Option<String> FORMAT = Option.newEnumOption(
+                    "format", BooleanAssignmentGroupsFormats.getNames())
+            .setDefaultValue(new BooleanAssignmentGroupsDimacsFormat().getName())
+            .setDescription("Format of the output");
+
     @Override
-    public IComputation<BooleanAssignmentList> newAnalysis(
+    public IComputation<BooleanAssignmentGroups> newAnalysis(
             OptionList optionParser, IComputation<BooleanAssignmentList> formula) {
         IComputation<BooleanAssignmentList> analysis = newTWiseAnalysis(optionParser, formula)
                 .set(ATWiseSampleComputation.CONFIGURATION_LIMIT, optionParser.get(LIMIT_OPTION))
@@ -97,24 +102,15 @@ public abstract class ATWiseCommand extends ASAT4JAnalysisCommand<BooleanAssignm
             }
         }
 
-        return analysis;
+        return analysis.mapResult(ATWiseCommand.class, "group", BooleanAssignmentGroups::new);
     }
 
     protected abstract IComputation<BooleanAssignmentList> newTWiseAnalysis(
             OptionList optionParser, IComputation<BooleanAssignmentList> formula);
 
     @Override
-    protected Object getOuputObject(BooleanAssignmentList list) {
-        return new BooleanAssignmentGroups(list);
-    }
-
-    @Override
-    protected IFormat<?> getOuputFormat() {
-        return new BooleanSolutionListCSVFormat();
-    }
-
-    @Override
-    public String printResult(BooleanAssignmentList assignments) {
-        return assignments.serialize();
+    protected IFormat<BooleanAssignmentGroups> getOuputFormat(OptionList optionParser) {
+        return BooleanAssignmentGroupsFormats.getGefFormatByName(optionParser.get(FORMAT))
+                .orElse(new BooleanAssignmentGroupsDimacsFormat());
     }
 }

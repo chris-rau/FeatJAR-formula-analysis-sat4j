@@ -24,10 +24,9 @@ import de.featjar.analysis.sat4j.computation.ComputeCoreDeadMIG;
 import de.featjar.base.cli.OptionList;
 import de.featjar.base.computation.IComputation;
 import de.featjar.base.io.format.IFormat;
-import de.featjar.formula.assignment.BooleanAssignment;
 import de.featjar.formula.assignment.BooleanAssignmentGroups;
 import de.featjar.formula.assignment.BooleanAssignmentList;
-import de.featjar.formula.io.csv.BooleanAssignmentGroupsCSVFormat;
+import de.featjar.formula.io.dimacs.BooleanAssignmentGroupsDimacsFormat;
 import java.util.Optional;
 
 /**
@@ -36,7 +35,7 @@ import java.util.Optional;
  * @author Sebastian Krieter
  * @author Andreas Gerasimow
  */
-public class CoreCommand extends ASAT4JAnalysisCommand<BooleanAssignment, BooleanAssignment> {
+public class CoreCommand extends ASAT4JAnalysisCommand<BooleanAssignmentGroups> {
 
     @Override
     public Optional<String> getDescription() {
@@ -44,24 +43,15 @@ public class CoreCommand extends ASAT4JAnalysisCommand<BooleanAssignment, Boolea
     }
 
     @Override
-    public IComputation<BooleanAssignment> newAnalysis(
+    public IComputation<BooleanAssignmentGroups> newAnalysis(
             OptionList optionParser, IComputation<BooleanAssignmentList> formula) {
-        return formula.map(ComputeCoreDeadMIG::new);
+        return formula.map(ComputeCoreDeadMIG::new)
+                .mapResult(CoreCommand.class, "group", a -> new BooleanAssignmentGroups(variableMap, a));
     }
 
     @Override
-    protected Object getOuputObject(BooleanAssignment list) {
-        return variableMap == null ? null : new BooleanAssignmentGroups(variableMap, list);
-    }
-
-    @Override
-    protected IFormat<?> getOuputFormat() {
-        return new BooleanAssignmentGroupsCSVFormat();
-    }
-
-    @Override
-    public String printResult(BooleanAssignment assignment) {
-        return assignment.print();
+    protected IFormat<BooleanAssignmentGroups> getOuputFormat(OptionList optionParser) {
+        return new BooleanAssignmentGroupsDimacsFormat();
     }
 
     @Override

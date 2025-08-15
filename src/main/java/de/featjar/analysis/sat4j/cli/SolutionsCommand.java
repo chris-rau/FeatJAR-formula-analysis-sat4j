@@ -28,7 +28,9 @@ import de.featjar.base.computation.IComputation;
 import de.featjar.base.io.format.IFormat;
 import de.featjar.formula.assignment.BooleanAssignmentGroups;
 import de.featjar.formula.assignment.BooleanAssignmentList;
-import de.featjar.formula.io.csv.BooleanSolutionListCSVFormat;
+import de.featjar.formula.io.BooleanAssignmentGroupsFormats;
+import de.featjar.formula.io.csv.BooleanAssignmentGroupsUngroupedCSVFormat;
+import de.featjar.formula.io.dimacs.BooleanAssignmentGroupsDimacsFormat;
 import java.util.Optional;
 
 /**
@@ -37,7 +39,7 @@ import java.util.Optional;
  * @author Sebastian Krieter
  * @author Andreas Gerasimow
  */
-public class SolutionsCommand extends ASAT4JAnalysisCommand<BooleanAssignmentList, BooleanAssignmentList> {
+public class SolutionsCommand extends ASAT4JAnalysisCommand<BooleanAssignmentGroups> {
 
     /**
      * Maximum number of configurations to be generated.
@@ -62,13 +64,18 @@ public class SolutionsCommand extends ASAT4JAnalysisCommand<BooleanAssignmentLis
     public static final Option<Boolean> FORBID_DUPLICATES_OPTION = Option.newFlag("no-duplicates") //
             .setDescription("Forbid dublicate configurations to be generated.");
 
+    public static final Option<String> FORMAT = Option.newEnumOption(
+                    "format", BooleanAssignmentGroupsFormats.getNames())
+            .setDefaultValue(new BooleanAssignmentGroupsDimacsFormat().getName())
+            .setDescription("Format of the output");
+
     @Override
     public Optional<String> getDescription() {
         return Optional.of("Computes solutions for a given formula using SAT4J.");
     }
 
     @Override
-    public IComputation<BooleanAssignmentList> newAnalysis(
+    public IComputation<BooleanAssignmentGroups> newAnalysis(
             OptionList optionParser, IComputation<BooleanAssignmentList> formula) {
         return formula.map(ComputeSolutionsSAT4J::new)
                 .set(
@@ -85,22 +92,13 @@ public class SolutionsCommand extends ASAT4JAnalysisCommand<BooleanAssignmentLis
                         optionParser.getResult(RANDOM_SEED_OPTION).get())
                 .set(
                         ComputeSolutionsSAT4J.SAT_TIMEOUT,
-                        optionParser.getResult(SAT_TIMEOUT_OPTION).get());
+                        optionParser.getResult(SAT_TIMEOUT_OPTION).get())
+                .mapResult(SolutionsCommand.class, "group", BooleanAssignmentGroups::new);
     }
 
     @Override
-    protected Object getOuputObject(BooleanAssignmentList list) {
-        return new BooleanAssignmentGroups(list);
-    }
-
-    @Override
-    protected IFormat<?> getOuputFormat() {
-        return new BooleanSolutionListCSVFormat();
-    }
-
-    @Override
-    public String printResult(BooleanAssignmentList list) {
-        return list.print();
+    protected IFormat<BooleanAssignmentGroups> getOuputFormat(OptionList optionParser) {
+        return new BooleanAssignmentGroupsUngroupedCSVFormat();
     }
 
     @Override

@@ -27,7 +27,8 @@ import de.featjar.base.computation.IComputation;
 import de.featjar.base.io.format.IFormat;
 import de.featjar.formula.assignment.BooleanAssignmentGroups;
 import de.featjar.formula.assignment.BooleanAssignmentList;
-import de.featjar.formula.io.csv.BooleanSolutionListCSVFormat;
+import de.featjar.formula.io.BooleanAssignmentGroupsFormats;
+import de.featjar.formula.io.dimacs.BooleanAssignmentGroupsDimacsFormat;
 import java.util.Optional;
 
 /**
@@ -37,7 +38,7 @@ import java.util.Optional;
  * @author Sebastian Krieter
  * @author Andreas Gerasimow
  */
-public class AtomicSetsCommand extends ASAT4JAnalysisCommand<BooleanAssignmentList, BooleanAssignmentList> {
+public class AtomicSetsCommand extends ASAT4JAnalysisCommand<BooleanAssignmentGroups> {
 
     public static final Option<Boolean> OMIT_SINGLE_SETS = Option.newFlag("omit-singles")
             .setDefaultValue(Boolean.FALSE)
@@ -45,32 +46,29 @@ public class AtomicSetsCommand extends ASAT4JAnalysisCommand<BooleanAssignmentLi
     public static final Option<Boolean> OMIT_CORE =
             Option.newFlag("omit-core").setDefaultValue(Boolean.FALSE).setDescription("Omits set containing core");
 
+    public static final Option<String> FORMAT = Option.newEnumOption(
+                    "format", BooleanAssignmentGroupsFormats.getNames())
+            .setDefaultValue(new BooleanAssignmentGroupsDimacsFormat().getName())
+            .setDescription("Format of the output");
+
     @Override
     public Optional<String> getDescription() {
         return Optional.of("Computes atomic sets for a given formula using SAT4J.");
     }
 
     @Override
-    public IComputation<BooleanAssignmentList> newAnalysis(
+    public IComputation<BooleanAssignmentGroups> newAnalysis(
             OptionList optionParser, IComputation<BooleanAssignmentList> formula) {
         return formula.map(ComputeAtomicSetsSAT4J::new)
                 .set(ComputeAtomicSetsSAT4J.OMIT_CORE, optionParser.get(OMIT_CORE))
-                .set(ComputeAtomicSetsSAT4J.OMIT_SINGLE_SETS, optionParser.get(OMIT_SINGLE_SETS));
+                .set(ComputeAtomicSetsSAT4J.OMIT_SINGLE_SETS, optionParser.get(OMIT_SINGLE_SETS))
+                .mapResult(AtomicSetsCommand.class, "group", BooleanAssignmentGroups::new);
     }
 
     @Override
-    protected Object getOuputObject(BooleanAssignmentList list) {
-        return new BooleanAssignmentGroups(list);
-    }
-
-    @Override
-    protected IFormat<?> getOuputFormat() {
-        return new BooleanSolutionListCSVFormat();
-    }
-
-    @Override
-    public String printResult(BooleanAssignmentList list) {
-        return list.print();
+    protected IFormat<BooleanAssignmentGroups> getOuputFormat(OptionList optionParser) {
+        return BooleanAssignmentGroupsFormats.getGefFormatByName(optionParser.get(FORMAT))
+                .orElse(new BooleanAssignmentGroupsDimacsFormat());
     }
 
     @Override

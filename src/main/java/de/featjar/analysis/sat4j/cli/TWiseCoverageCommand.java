@@ -22,6 +22,7 @@ package de.featjar.analysis.sat4j.cli;
 
 import de.featjar.analysis.AAnalysisCommand;
 import de.featjar.analysis.sat4j.computation.ComputeConstraintedTWiseCoverage;
+import de.featjar.analysis.sat4j.io.textual.CoverageStatisticTextFormat;
 import de.featjar.base.cli.Option;
 import de.featjar.base.cli.OptionList;
 import de.featjar.base.computation.Computations;
@@ -29,7 +30,6 @@ import de.featjar.base.computation.IComputation;
 import de.featjar.base.data.Result;
 import de.featjar.base.io.IO;
 import de.featjar.base.io.format.IFormat;
-import de.featjar.base.io.text.StringTextFormat;
 import de.featjar.base.log.Log.Verbosity;
 import de.featjar.formula.CoverageStatistic;
 import de.featjar.formula.assignment.BooleanAssignmentGroups;
@@ -200,21 +200,8 @@ public class TWiseCoverageCommand extends AAnalysisCommand<CoverageStatistic> {
     }
 
     @Override
-    protected IFormat<?> getOuputFormat() {
-        return new StringTextFormat();
-    }
-
-    @Override
-    protected String printResult(CoverageStatistic result) {
-        return coverageOnly
-                ? countOnly
-                        ? result.coverage() + "\n" + result.covered() + "\n" + result.uncovered() + "\n"
-                                + result.invalid() + "\n" + result.ignored()
-                        : String.valueOf(result.coverage())
-                : countOnly
-                        ? result.covered() + "\n" + result.uncovered() + "\n" + result.invalid() + "\n"
-                                + result.ignored()
-                        : result.print();
+    protected IFormat<CoverageStatistic> getOuputFormat(OptionList optionParser) {
+        return new CoverageStatisticTextFormat(coverageOnly, countOnly);
     }
 
     @Override

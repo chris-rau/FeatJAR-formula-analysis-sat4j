@@ -33,7 +33,7 @@ import de.featjar.formula.assignment.BooleanAssignment;
 import de.featjar.formula.assignment.BooleanAssignmentGroups;
 import de.featjar.formula.assignment.BooleanAssignmentList;
 import de.featjar.formula.io.BooleanAssignmentGroupsFormats;
-import de.featjar.formula.io.csv.BooleanSolutionListCSVFormat;
+import de.featjar.formula.io.dimacs.BooleanAssignmentGroupsDimacsFormat;
 import java.nio.file.Path;
 import java.util.Optional;
 
@@ -42,7 +42,7 @@ import java.util.Optional;
  *
  * @author Sebastian Krieter
  */
-public abstract class InciidentCommand extends ASAT4JAnalysisCommand<BooleanAssignment, BooleanAssignmentList> {
+public abstract class InciidentCommand extends ASAT4JAnalysisCommand<BooleanAssignmentGroups> {
 
     /**
      * Maximum number of tests to be performed.
@@ -78,7 +78,7 @@ public abstract class InciidentCommand extends ASAT4JAnalysisCommand<BooleanAssi
             .setValidator(Option.PathValidator);
 
     @Override
-    public IComputation<BooleanAssignment> newAnalysis(
+    public IComputation<BooleanAssignmentGroups> newAnalysis(
             OptionList optionParser, IComputation<BooleanAssignmentList> formula) {
         IComputation<BooleanAssignment> analysis = formula.map(Inciident::new)
                 .set(Inciident.T, optionParser.get(T_OPTION))
@@ -97,15 +97,15 @@ public abstract class InciidentCommand extends ASAT4JAnalysisCommand<BooleanAssi
             }
         }
 
-        return analysis;
+        return analysis.mapResult(Inciident.class, "group", a -> new BooleanAssignmentGroups(variableMap, a));
     }
 
     protected abstract IComputation<BooleanAssignmentList> newTWiseAnalysis(
             OptionList optionParser, IComputation<BooleanAssignmentList> formula);
 
     @Override
-    protected IFormat<?> getOuputFormat() {
-        return new BooleanSolutionListCSVFormat();
+    protected IFormat<BooleanAssignmentGroups> getOuputFormat(OptionList optionParser) {
+        return new BooleanAssignmentGroupsDimacsFormat();
     }
 
     @Override

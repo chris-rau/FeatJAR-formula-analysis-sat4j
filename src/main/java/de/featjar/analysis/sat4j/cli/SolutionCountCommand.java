@@ -34,7 +34,7 @@ import java.util.Optional;
  * @author Elias Kuiter
  * @author Andreas Gerasimow
  */
-public class SolutionCountCommand extends ASAT4JAnalysisCommand<BigInteger, BigInteger> {
+public class SolutionCountCommand extends ASAT4JAnalysisCommand<BigInteger> {
 
     @Override
     public Optional<String> getDescription() {
@@ -44,11 +44,6 @@ public class SolutionCountCommand extends ASAT4JAnalysisCommand<BigInteger, BigI
     @Override
     public IComputation<BigInteger> newAnalysis(OptionList optionParser, IComputation<BooleanAssignmentList> formula) {
         return formula.map(ComputeSolutionCountSAT4J::new);
-    }
-
-    @Override
-    public String printResult(BigInteger count) {
-        return count.toString();
     }
 
     @Override

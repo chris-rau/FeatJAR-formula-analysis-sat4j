@@ -36,7 +36,7 @@ import de.featjar.formula.io.FormulaFormats;
 import java.nio.file.Path;
 import java.time.Duration;
 
-public abstract class ASAT4JAnalysisCommand<T, U> extends AAnalysisCommand<T> {
+public abstract class ASAT4JAnalysisCommand<T> extends AAnalysisCommand<T> {
 
     /**
      * Option for setting the seed for the pseudo random generator.
