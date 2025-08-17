@@ -119,7 +119,8 @@ public class TWiseCoverageCommand extends AAnalysisCommand<CoverageStatistic> {
                     + REFERENCE_SAMPLE_OPTION.getArgumentName() + " at the same time!");
         }
 
-        IComputation<BooleanAssignmentList> sample = IO.load(samplePath, BooleanAssignmentGroupsFormats.getInstance())
+        IComputation<BooleanAssignmentList> sample = IO.load(
+                        samplePath, BooleanAssignmentGroupsFormats.getInstance(), ioInputOptions)
                 .map(BooleanAssignmentGroups::getFirstGroup)
                 .toComputation();
 

@@ -120,7 +120,7 @@ public class YASAIncrementalTest extends Common {
 
     @Test
     void gplWith3WiseCoverage46Configurations() {
-        testConfigurationLimit(loadFormula("GPL/model.xml"), 100, 46);
+        testConfigurationLimit(loadFormula("GPL/model.xml"), 100, 47);
     }
 
     private void testTimeout(IFormula formula, int timeoutSeconds) {

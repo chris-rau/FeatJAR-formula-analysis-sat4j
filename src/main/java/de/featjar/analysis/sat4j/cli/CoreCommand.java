@@ -24,9 +24,8 @@ import de.featjar.analysis.sat4j.computation.ComputeCoreDeadMIG;
 import de.featjar.base.cli.OptionList;
 import de.featjar.base.computation.IComputation;
 import de.featjar.base.io.format.IFormat;
-import de.featjar.formula.assignment.BooleanAssignmentGroups;
 import de.featjar.formula.assignment.BooleanAssignmentList;
-import de.featjar.formula.io.dimacs.BooleanAssignmentGroupsDimacsFormat;
+import de.featjar.formula.io.dimacs.BooleanAssignmentListDimacsFormat;
 import java.util.Optional;
 
 /**
@@ -35,7 +34,7 @@ import java.util.Optional;
  * @author Sebastian Krieter
  * @author Andreas Gerasimow
  */
-public class CoreCommand extends ASAT4JAnalysisCommand<BooleanAssignmentGroups> {
+public class CoreCommand extends ASAT4JAnalysisCommand<BooleanAssignmentList> {
 
     @Override
     public Optional<String> getDescription() {
@@ -43,15 +42,15 @@ public class CoreCommand extends ASAT4JAnalysisCommand<BooleanAssignmentGroups> 
     }
 
     @Override
-    public IComputation<BooleanAssignmentGroups> newAnalysis(
+    public IComputation<BooleanAssignmentList> newAnalysis(
             OptionList optionParser, IComputation<BooleanAssignmentList> formula) {
         return formula.map(ComputeCoreDeadMIG::new)
-                .mapResult(CoreCommand.class, "group", a -> new BooleanAssignmentGroups(variableMap, a));
+                .mapResult(CoreCommand.class, "list", a -> new BooleanAssignmentList(variableMap, a));
     }
 
     @Override
-    protected IFormat<BooleanAssignmentGroups> getOuputFormat(OptionList optionParser) {
-        return new BooleanAssignmentGroupsDimacsFormat();
+    protected IFormat<BooleanAssignmentList> getOuputFormat(OptionList optionParser) {
+        return new BooleanAssignmentListDimacsFormat();
     }
 
     @Override

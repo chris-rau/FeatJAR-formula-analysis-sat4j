@@ -25,10 +25,9 @@ import de.featjar.base.cli.Option;
 import de.featjar.base.cli.OptionList;
 import de.featjar.base.computation.IComputation;
 import de.featjar.base.io.format.IFormat;
-import de.featjar.formula.assignment.BooleanAssignmentGroups;
 import de.featjar.formula.assignment.BooleanAssignmentList;
-import de.featjar.formula.io.BooleanAssignmentGroupsFormats;
-import de.featjar.formula.io.dimacs.BooleanAssignmentGroupsDimacsFormat;
+import de.featjar.formula.io.BooleanAssignmentListFormats;
+import de.featjar.formula.io.dimacs.BooleanAssignmentListDimacsFormat;
 import java.util.Optional;
 
 /**
@@ -38,17 +37,18 @@ import java.util.Optional;
  * @author Sebastian Krieter
  * @author Andreas Gerasimow
  */
-public class AtomicSetsCommand extends ASAT4JAnalysisCommand<BooleanAssignmentGroups> {
+public class AtomicSetsCommand extends ASAT4JAnalysisCommand<BooleanAssignmentList> {
 
-    public static final Option<Boolean> OMIT_SINGLE_SETS = Option.newFlag("omit-singles")
-            .setDefaultValue(Boolean.FALSE)
-            .setDescription("Omits sets with only one element");
+    public static final Option<Boolean> OMIT_SINGLE_SETS =
+            Option.newFlag("omit-singles").setDescription("Omits sets with only one element");
     public static final Option<Boolean> OMIT_CORE =
-            Option.newFlag("omit-core").setDefaultValue(Boolean.FALSE).setDescription("Omits set containing core");
+            Option.newFlag("omit-core").setDescription("Omits set containing core");
+    public static final Option<Boolean> OMIT_COMPLEMENTS =
+            Option.newFlag("omit-complements").setDescription("Omits complementary literals within a set.");
 
     public static final Option<String> FORMAT = Option.newEnumOption(
-                    "format", BooleanAssignmentGroupsFormats.getNames())
-            .setDefaultValue(new BooleanAssignmentGroupsDimacsFormat().getName())
+                    "format", BooleanAssignmentListFormats.getInstance().getNames())
+            .setDefaultValue(new BooleanAssignmentListDimacsFormat().getName())
             .setDescription("Format of the output");
 
     @Override
@@ -57,18 +57,19 @@ public class AtomicSetsCommand extends ASAT4JAnalysisCommand<BooleanAssignmentGr
     }
 
     @Override
-    public IComputation<BooleanAssignmentGroups> newAnalysis(
+    public IComputation<BooleanAssignmentList> newAnalysis(
             OptionList optionParser, IComputation<BooleanAssignmentList> formula) {
         return formula.map(ComputeAtomicSetsSAT4J::new)
                 .set(ComputeAtomicSetsSAT4J.OMIT_CORE, optionParser.get(OMIT_CORE))
                 .set(ComputeAtomicSetsSAT4J.OMIT_SINGLE_SETS, optionParser.get(OMIT_SINGLE_SETS))
-                .mapResult(AtomicSetsCommand.class, "group", BooleanAssignmentGroups::new);
+                .set(ComputeAtomicSetsSAT4J.OMIT_COMPLEMENTS, optionParser.get(OMIT_COMPLEMENTS));
     }
 
     @Override
-    protected IFormat<BooleanAssignmentGroups> getOuputFormat(OptionList optionParser) {
-        return BooleanAssignmentGroupsFormats.getGefFormatByName(optionParser.get(FORMAT))
-                .orElse(new BooleanAssignmentGroupsDimacsFormat());
+    protected IFormat<BooleanAssignmentList> getOuputFormat(OptionList optionParser) {
+        return BooleanAssignmentListFormats.getInstance()
+                .getFormatByName(optionParser.get(FORMAT))
+                .orElse(new BooleanAssignmentListDimacsFormat());
     }
 
     @Override

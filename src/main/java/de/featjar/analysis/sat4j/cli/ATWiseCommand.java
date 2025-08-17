@@ -31,7 +31,9 @@ import de.featjar.base.log.Log.Verbosity;
 import de.featjar.formula.assignment.BooleanAssignmentGroups;
 import de.featjar.formula.assignment.BooleanAssignmentList;
 import de.featjar.formula.io.BooleanAssignmentGroupsFormats;
-import de.featjar.formula.io.dimacs.BooleanAssignmentGroupsDimacsFormat;
+import de.featjar.formula.io.BooleanAssignmentListFormats;
+import de.featjar.formula.io.csv.BooleanAssignmentListCSVFormat;
+import de.featjar.formula.io.dimacs.BooleanAssignmentListDimacsFormat;
 import java.nio.file.Path;
 
 /**
@@ -39,7 +41,7 @@ import java.nio.file.Path;
  *
  * @author Sebastian Krieter
  */
-public abstract class ATWiseCommand extends ASAT4JAnalysisCommand<BooleanAssignmentGroups> {
+public abstract class ATWiseCommand extends ASAT4JAnalysisCommand<BooleanAssignmentList> {
 
     /**
      * Value of t.
@@ -71,12 +73,12 @@ public abstract class ATWiseCommand extends ASAT4JAnalysisCommand<BooleanAssignm
             .setValidator(Option.PathValidator);
 
     public static final Option<String> FORMAT = Option.newEnumOption(
-                    "format", BooleanAssignmentGroupsFormats.getNames())
-            .setDefaultValue(new BooleanAssignmentGroupsDimacsFormat().getName())
+                    "format", BooleanAssignmentListFormats.getInstance().getNames())
+            .setDefaultValue(new BooleanAssignmentListCSVFormat().getName())
             .setDescription("Format of the output");
 
     @Override
-    public IComputation<BooleanAssignmentGroups> newAnalysis(
+    public IComputation<BooleanAssignmentList> newAnalysis(
             OptionList optionParser, IComputation<BooleanAssignmentList> formula) {
         IComputation<BooleanAssignmentList> analysis = newTWiseAnalysis(optionParser, formula)
                 .set(ATWiseSampleComputation.CONFIGURATION_LIMIT, optionParser.get(LIMIT_OPTION))
@@ -101,16 +103,16 @@ public abstract class ATWiseCommand extends ASAT4JAnalysisCommand<BooleanAssignm
                 analysis.set(ATWiseSampleComputation.INITIAL_VARIABLE_SAMPLE, initialSample.getFirstGroup());
             }
         }
-
-        return analysis.mapResult(ATWiseCommand.class, "group", BooleanAssignmentGroups::new);
+        return analysis;
     }
 
     protected abstract IComputation<BooleanAssignmentList> newTWiseAnalysis(
             OptionList optionParser, IComputation<BooleanAssignmentList> formula);
 
     @Override
-    protected IFormat<BooleanAssignmentGroups> getOuputFormat(OptionList optionParser) {
-        return BooleanAssignmentGroupsFormats.getGefFormatByName(optionParser.get(FORMAT))
-                .orElse(new BooleanAssignmentGroupsDimacsFormat());
+    protected IFormat<BooleanAssignmentList> getOuputFormat(OptionList optionParser) {
+        return BooleanAssignmentListFormats.getInstance()
+                .getFormatByName(optionParser.get(FORMAT))
+                .orElse(new BooleanAssignmentListDimacsFormat());
     }
 }

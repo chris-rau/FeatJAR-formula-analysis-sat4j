@@ -67,8 +67,8 @@ public abstract class ASAT4JAnalysisCommand<T> extends AAnalysisCommand<T> {
                         .toComputation()
                         .map(ComputeNNFFormula::new)
                         .map(ComputeCNFFormula::new)
-                        .map(ComputeBooleanClauseList::new));
-        computation.peekResult(getClass(), "variableMap", clauseList -> variableMap = clauseList.getVariableMap());
+                        .map(ComputeBooleanClauseList::new))
+                .peekResult(getClass(), "variableMap", clauseList -> variableMap = clauseList.getVariableMap());
         return newAnalysis(optionParser, computation);
     }
 

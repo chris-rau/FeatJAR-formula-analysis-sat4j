@@ -33,7 +33,7 @@ import de.featjar.formula.assignment.BooleanAssignment;
 import de.featjar.formula.assignment.BooleanAssignmentGroups;
 import de.featjar.formula.assignment.BooleanAssignmentList;
 import de.featjar.formula.io.BooleanAssignmentGroupsFormats;
-import de.featjar.formula.io.dimacs.BooleanAssignmentGroupsDimacsFormat;
+import de.featjar.formula.io.dimacs.BooleanAssignmentListDimacsFormat;
 import java.nio.file.Path;
 import java.util.Optional;
 
@@ -42,7 +42,7 @@ import java.util.Optional;
  *
  * @author Sebastian Krieter
  */
-public abstract class InciidentCommand extends ASAT4JAnalysisCommand<BooleanAssignmentGroups> {
+public abstract class InciidentCommand extends ASAT4JAnalysisCommand<BooleanAssignmentList> {
 
     /**
      * Maximum number of tests to be performed.
@@ -78,7 +78,7 @@ public abstract class InciidentCommand extends ASAT4JAnalysisCommand<BooleanAssi
             .setValidator(Option.PathValidator);
 
     @Override
-    public IComputation<BooleanAssignmentGroups> newAnalysis(
+    public IComputation<BooleanAssignmentList> newAnalysis(
             OptionList optionParser, IComputation<BooleanAssignmentList> formula) {
         IComputation<BooleanAssignment> analysis = formula.map(Inciident::new)
                 .set(Inciident.T, optionParser.get(T_OPTION))
@@ -96,16 +96,15 @@ public abstract class InciidentCommand extends ASAT4JAnalysisCommand<BooleanAssi
                 analysis.set(Inciident.INITIAL_SAMPLE, initialSample.getFirstGroup());
             }
         }
-
-        return analysis.mapResult(Inciident.class, "group", a -> new BooleanAssignmentGroups(variableMap, a));
+        return analysis.mapResult(Inciident.class, "list", a -> new BooleanAssignmentList(variableMap, a));
     }
 
     protected abstract IComputation<BooleanAssignmentList> newTWiseAnalysis(
             OptionList optionParser, IComputation<BooleanAssignmentList> formula);
 
     @Override
-    protected IFormat<BooleanAssignmentGroups> getOuputFormat(OptionList optionParser) {
-        return new BooleanAssignmentGroupsDimacsFormat();
+    protected IFormat<BooleanAssignmentList> getOuputFormat(OptionList optionParser) {
+        return new BooleanAssignmentListDimacsFormat();
     }
 
     @Override

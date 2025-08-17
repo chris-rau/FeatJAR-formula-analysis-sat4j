@@ -30,7 +30,6 @@ import de.featjar.formula.assignment.BooleanAssignmentGroups;
 import de.featjar.formula.assignment.BooleanAssignmentList;
 import de.featjar.formula.io.BooleanAssignmentGroupsFormats;
 import de.featjar.formula.io.csv.BooleanAssignmentGroupsUngroupedCSVFormat;
-import de.featjar.formula.io.dimacs.BooleanAssignmentGroupsDimacsFormat;
 import java.util.Optional;
 
 /**
@@ -65,8 +64,8 @@ public class SolutionsCommand extends ASAT4JAnalysisCommand<BooleanAssignmentGro
             .setDescription("Forbid dublicate configurations to be generated.");
 
     public static final Option<String> FORMAT = Option.newEnumOption(
-                    "format", BooleanAssignmentGroupsFormats.getNames())
-            .setDefaultValue(new BooleanAssignmentGroupsDimacsFormat().getName())
+                    "format", BooleanAssignmentGroupsFormats.getInstance().getNames())
+            .setDefaultValue(new BooleanAssignmentGroupsUngroupedCSVFormat().getName())
             .setDescription("Format of the output");
 
     @Override
@@ -98,7 +97,9 @@ public class SolutionsCommand extends ASAT4JAnalysisCommand<BooleanAssignmentGro
 
     @Override
     protected IFormat<BooleanAssignmentGroups> getOuputFormat(OptionList optionParser) {
-        return new BooleanAssignmentGroupsUngroupedCSVFormat();
+        return BooleanAssignmentGroupsFormats.getInstance()
+                .getFormatByName(optionParser.get(FORMAT))
+                .orElse(new BooleanAssignmentGroupsUngroupedCSVFormat());
     }
 
     @Override
