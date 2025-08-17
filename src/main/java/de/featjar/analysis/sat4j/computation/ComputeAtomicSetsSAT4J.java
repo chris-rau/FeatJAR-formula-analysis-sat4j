@@ -49,6 +49,7 @@ public class ComputeAtomicSetsSAT4J extends ASAT4JAnalysis.Solution<BooleanAssig
             Dependency.newDependency(BooleanAssignment.class);
     public static final Dependency<Boolean> OMIT_SINGLE_SETS = Dependency.newDependency(Boolean.class);
     public static final Dependency<Boolean> OMIT_CORE = Dependency.newDependency(Boolean.class);
+    public static final Dependency<Boolean> OMIT_COMPLEMENTS = Dependency.newDependency(Boolean.class);
 
     private List<BitSet> solutions;
     private int variableCount, bitSetSize;
@@ -59,6 +60,7 @@ public class ComputeAtomicSetsSAT4J extends ASAT4JAnalysis.Solution<BooleanAssig
         super(
                 clauseList,
                 Computations.of(new BooleanAssignment()),
+                Computations.of(Boolean.FALSE),
                 Computations.of(Boolean.FALSE),
                 Computations.of(Boolean.FALSE));
     }
@@ -80,6 +82,7 @@ public class ComputeAtomicSetsSAT4J extends ASAT4JAnalysis.Solution<BooleanAssig
 
         boolean omitCore = OMIT_CORE.get(dependencyList);
         boolean omitSingles = OMIT_SINGLE_SETS.get(dependencyList);
+        boolean omitComplements = OMIT_COMPLEMENTS.get(dependencyList);
 
         final BooleanAssignmentList atomicSets = new BooleanAssignmentList(variableMap);
         variableCount = variableMap.getVariableCount();
@@ -190,21 +193,25 @@ public class ComputeAtomicSetsSAT4J extends ASAT4JAnalysis.Solution<BooleanAssig
                     }
                 }
 
-                int ui = commonLiterals.nextSetBit(vi + 2);
-                while (ui >= 0) {
+                int ui = vi;
+                while ((ui = commonLiterals.nextSetBit(ui + 2)) >= 0) {
                     final int u;
                     if (((ui & 1) == 0)) {
                         u = (ui >> 1) + 1;
                     } else {
-                        u = -((ui >> 1) + 1);
-                        ui--;
+                        if (omitComplements) {
+                            ui--;
+                            continue;
+                        } else {
+                            u = -((ui >> 1) + 1);
+                            ui--;
+                        }
                     }
                     if (unsat(solver, -v, u) && unsat(solver, v, -u)) {
                         atomicSet.add(u);
                         undecided.clear(ui);
                         undecided.clear(ui + 1);
                     }
-                    ui = commonLiterals.nextSetBit(ui + 2);
                 }
 
                 if (!omitSingles || atomicSet.size() > 1) {
