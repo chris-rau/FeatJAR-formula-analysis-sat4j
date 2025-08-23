@@ -23,6 +23,7 @@ package de.featjar.analysis.sat4j.computation;
 import de.featjar.analysis.RuntimeContradictionException;
 import de.featjar.analysis.RuntimeTimeoutException;
 import de.featjar.analysis.sat4j.solver.IMIGVisitor;
+import de.featjar.analysis.sat4j.solver.ISelectionStrategy;
 import de.featjar.analysis.sat4j.solver.MIGVisitorBitSet;
 import de.featjar.analysis.sat4j.solver.MIGVisitorByte;
 import de.featjar.analysis.sat4j.solver.ModalImplicationGraph;
@@ -142,10 +143,11 @@ public class YASA extends ATWiseSampleComputation {
 
         solver = new SAT4JSolutionSolver(clauseList);
         SAT4JSolver.initializeSolver(solver, clauseList, assumedAssignment, assumedClauseList, timeout);
-
+        solver.setSelectionStrategy(ISelectionStrategy.random(random));
+        
         selectionCandidates = new ArrayList<>();
 
-        progress.setTotalSteps(combinationSets.loopCount());
+        progress.setTotalSteps((iterations + 1) * combinationSets.loopCount());
 
         buildCombinations(progress);
         rebuildCombinations(progress);
