@@ -42,7 +42,7 @@ import java.util.Optional;
  *
  * @author Sebastian Krieter
  */
-public abstract class InciidentCommand extends ASAT4JAnalysisCommand<BooleanAssignmentList> {
+public class InciidentCommand extends ASAT4JAnalysisCommand<BooleanAssignmentList> {
 
     /**
      * Maximum number of tests to be performed.
@@ -98,9 +98,6 @@ public abstract class InciidentCommand extends ASAT4JAnalysisCommand<BooleanAssi
         }
         return analysis.mapResult(Inciident.class, "list", a -> new BooleanAssignmentList(variableMap, a));
     }
-
-    protected abstract IComputation<BooleanAssignmentList> newTWiseAnalysis(
-            OptionList optionParser, IComputation<BooleanAssignmentList> formula);
 
     @Override
     protected IFormat<BooleanAssignmentList> getOuputFormat(OptionList optionParser) {
