@@ -144,7 +144,7 @@ public class YASA extends ATWiseSampleComputation {
         solver = new SAT4JSolutionSolver(clauseList);
         SAT4JSolver.initializeSolver(solver, clauseList, assumedAssignment, assumedClauseList, timeout);
         solver.setSelectionStrategy(ISelectionStrategy.random(random));
-        
+
         selectionCandidates = new ArrayList<>();
 
         progress.setTotalSteps((iterations + 1) * combinationSets.loopCount());

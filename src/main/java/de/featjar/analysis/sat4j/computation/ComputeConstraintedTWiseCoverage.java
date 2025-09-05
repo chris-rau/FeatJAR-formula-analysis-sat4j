@@ -24,7 +24,6 @@ import de.featjar.analysis.RuntimeContradictionException;
 import de.featjar.analysis.RuntimeTimeoutException;
 import de.featjar.analysis.sat4j.solver.ISelectionStrategy;
 import de.featjar.analysis.sat4j.solver.MIGVisitorByte;
-import de.featjar.analysis.sat4j.solver.ModalImplicationGraph;
 import de.featjar.analysis.sat4j.solver.SAT4JSolutionSolver;
 import de.featjar.analysis.sat4j.solver.SAT4JSolver;
 import de.featjar.base.computation.Computations;
@@ -81,7 +80,7 @@ public class ComputeConstraintedTWiseCoverage extends AComputeTWiseCoverage {
 
     private SampleBitIndex randomSampleIndex;
     private Random random;
-    private ModalImplicationGraph mig;
+    private MIGVisitorByte visitor;
     private SAT4JSolutionSolver solver;
 
     @Override
@@ -114,17 +113,18 @@ public class ComputeConstraintedTWiseCoverage extends AComputeTWiseCoverage {
         solver = new SAT4JSolutionSolver(clauseList);
         SAT4JSolver.initializeSolver(solver, clauseList, assumedAssignment, assumedClauseList, timeout);
         solver.setSelectionStrategy(ISelectionStrategy.random(random));
-        mig = new MIGBuilder(Computations.of(clauseList)).compute();
+        visitor = new MIGVisitorByte(new MIGBuilder(Computations.of(clauseList)).compute());
 
         randomSampleIndex = new SampleBitIndex(sample.getVariableMap());
     }
 
     private boolean isCombinationInvalidMIG(int[] literals) {
         try {
-            MIGVisitorByte visitor = new MIGVisitorByte(mig);
             visitor.propagate(literals);
         } catch (RuntimeContradictionException e) {
             return true;
+        } finally {
+            visitor.reset();
         }
         return false;
     }
