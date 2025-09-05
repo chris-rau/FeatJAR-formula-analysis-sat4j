@@ -46,7 +46,7 @@ public class AtomicSetsCommand extends ASAT4JAnalysisCommand<BooleanAssignmentLi
     public static final Option<Boolean> OMIT_COMPLEMENTS =
             Option.newFlag("omit-complements").setDescription("Omits complementary literals within a set.");
 
-    public static final Option<String> FORMAT = Option.newEnumOption(
+    public static final Option<String> FORMAT = Option.newStringEnumOption(
                     "format", BooleanAssignmentListFormats.getInstance().getNames())
             .setDefaultValue(new BooleanAssignmentListDimacsFormat().getName())
             .setDescription("Format of the output");

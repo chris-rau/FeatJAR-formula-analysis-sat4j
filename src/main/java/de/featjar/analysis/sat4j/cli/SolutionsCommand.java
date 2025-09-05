@@ -50,11 +50,9 @@ public class SolutionsCommand extends ASAT4JAnalysisCommand<BooleanAssignmentGro
     /**
      * Strategy to use for generating each configuration (%s).
      */
-    public static final Option<ISelectionStrategy.Strategy> SELECTION_STRATEGY_OPTION = Option.newOption(
-                    "strategy", Option.valueOf(ISelectionStrategy.Strategy.class)) //
-            .setDescription(String.format(
-                    "Strategy to use for generating each configuration (%s).",
-                    Option.possibleValues(ISelectionStrategy.Strategy.class))) //
+    public static final Option<ISelectionStrategy.Strategy> SELECTION_STRATEGY_OPTION = Option.newEnumOption(
+                    "strategy", ISelectionStrategy.Strategy.class) //
+            .setDescription("Strategy to use for generating each configuration.") //
             .setDefaultValue(ISelectionStrategy.Strategy.ORIGINAL);
 
     /**
@@ -63,7 +61,7 @@ public class SolutionsCommand extends ASAT4JAnalysisCommand<BooleanAssignmentGro
     public static final Option<Boolean> FORBID_DUPLICATES_OPTION = Option.newFlag("no-duplicates") //
             .setDescription("Forbid dublicate configurations to be generated.");
 
-    public static final Option<String> FORMAT = Option.newEnumOption(
+    public static final Option<String> FORMAT = Option.newStringEnumOption(
                     "format", BooleanAssignmentGroupsFormats.getInstance().getNames())
             .setDefaultValue(new BooleanAssignmentGroupsUngroupedCSVFormat().getName())
             .setDescription("Format of the output");

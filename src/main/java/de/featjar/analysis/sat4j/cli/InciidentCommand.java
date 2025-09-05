@@ -49,7 +49,6 @@ public class InciidentCommand extends ASAT4JAnalysisCommand<BooleanAssignmentLis
      */
     public static final Option<Integer> LIMIT_OPTION = Option.newOption("n", Option.IntegerParser) //
             .setDescription("Maximum number of tests to be performed.") //
-            .setRequired(false)
             .setDefaultValue(Integer.MAX_VALUE);
 
     /**
@@ -57,7 +56,6 @@ public class InciidentCommand extends ASAT4JAnalysisCommand<BooleanAssignmentLis
      */
     public static final Option<Integer> T_OPTION = Option.newOption("t", Option.IntegerParser) //
             .setDescription("Value(s) of parameter t.") //
-            .setRequired(true)
             .setDefaultValue(1);
 
     /**
@@ -65,7 +63,6 @@ public class InciidentCommand extends ASAT4JAnalysisCommand<BooleanAssignmentLis
      */
     public static final Option<Path> INITIAL_SAMPLE_OPTION = Option.newOption("initial-sample", Option.PathParser)
             .setDescription("Path to initial sample file.")
-            .setRequired(false)
             .setDefaultValue(null)
             .setValidator(Option.PathValidator);
 
@@ -74,7 +71,6 @@ public class InciidentCommand extends ASAT4JAnalysisCommand<BooleanAssignmentLis
      */
     public static final Option<Path> TESTER_EXECUTABLE = Option.newOption("verifier", Option.PathParser)
             .setDescription("Path to initial sample file.")
-            .setRequired(true)
             .setValidator(Option.PathValidator);
 
     @Override

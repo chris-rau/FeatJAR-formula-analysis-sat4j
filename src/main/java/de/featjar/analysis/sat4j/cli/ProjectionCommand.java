@@ -55,18 +55,18 @@ import java.util.Set;
 public class ProjectionCommand extends ACommand {
 
     /**
-     * Literals to be removed.;
+     * Literals to be removed
      */
-    public static final ListOption<String> LITERALS_SLICE_OPTION =
-            (ListOption<String>) Option.newListOption("slice", Option.StringParser)
-                    .setDescription("Literals to be removed.")
-                    .setRequired(false);
+    public static final ListOption<String> LITERALS_SLICE_OPTION = (ListOption<String>)
+            Option.newListOption("slice", Option.StringParser).setDescription("Literals to be removed.");
 
-    public static final ListOption<String> LITERALS_PROJECT_OPTION =
-            (ListOption<String>) Option.newListOption("project", Option.StringParser)
+    /**
+     * Literals to be kept
+     */
+    public static final ListOption<String> LITERALS_PROJECT_OPTION = (ListOption<String>)
+            Option.newListOption("project", Option.StringParser)
                     .setDescription(
-                            "Literals to be projected. If not set, all features will be projected. The slice option has a higher priority, i.e. if both the project and slice option contain the same literal, it will be removed.")
-                    .setRequired(false);
+                            "Literals to be projected. If not set, all features will be projected. The slice option has a higher priority, i.e. if both the project and slice option contain the same literal, it will be removed.");
 
     /**
      * Timeout in seconds.

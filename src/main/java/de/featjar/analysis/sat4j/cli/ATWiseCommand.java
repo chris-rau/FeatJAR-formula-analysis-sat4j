@@ -72,7 +72,7 @@ public abstract class ATWiseCommand extends ASAT4JAnalysisCommand<BooleanAssignm
             .setDescription("Path to initial variable sample file. Configurations in this sample can be modified.")
             .setValidator(Option.PathValidator);
 
-    public static final Option<String> FORMAT = Option.newEnumOption(
+    public static final Option<String> FORMAT = Option.newStringEnumOption(
                     "format", BooleanAssignmentListFormats.getInstance().getNames())
             .setDefaultValue(new BooleanAssignmentListCSVFormat().getName())
             .setDescription("Format of the output");
