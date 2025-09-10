@@ -28,8 +28,8 @@ import de.featjar.base.computation.Dependency;
 import de.featjar.base.computation.IComputation;
 import de.featjar.base.computation.Progress;
 import de.featjar.base.data.IntegerList;
-import de.featjar.base.data.LexicographicIterator;
 import de.featjar.base.data.Result;
+import de.featjar.base.data.SingleLexicographicIterator;
 import de.featjar.formula.VariableMap;
 import de.featjar.formula.assignment.BooleanAssignment;
 import de.featjar.formula.assignment.BooleanAssignmentList;
@@ -205,8 +205,8 @@ public class Inciident extends ASAT4JAnalysis.Solution<BooleanAssignment> {
             return List.of(commonLiterals);
         }
 
-        Stream<int[]> stream = LexicographicIterator.parallelStream(t, commonLiterals.length) //
-                .map(combo -> combo.getSelection(commonLiterals));
+        Stream<int[]> stream = SingleLexicographicIterator.parallelStream(commonLiterals, t) //
+                .map(combo -> combo.select());
         List<int[]> interactions;
         if (lastMerge != null) {
             BooleanAssignment lastLiterals = new BooleanAssignment(lastMerge).toClause();
