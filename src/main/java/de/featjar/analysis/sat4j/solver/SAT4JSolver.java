@@ -90,7 +90,7 @@ public abstract class SAT4JSolver implements de.featjar.analysis.ISolver {
         internalSolver.setVerbose(false);
         this.clauseList = new SAT4JClauseList(this, clauseList);
 
-        final int size = clauseList.getVariableMap().getVariableCount();
+        final int size = clauseList.getVariableMap().size();
         try {
             if (!clauseList.isEmpty()) {
                 internalSolver.setExpectedNumberOfClauses(clauseList.size() + 1);

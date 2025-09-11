@@ -235,7 +235,7 @@ public class YASALegacy extends ASAT4JAnalysis<BooleanAssignmentList> {
                 INITIAL_SAMPLE_COUNTS_TOWARDS_CONFIGURATION_LIMIT.get(dependencyList);
 
         variableMap = BOOLEAN_CLAUSE_LIST.get(dependencyList).getVariableMap();
-        variableCount = variableMap.getVariableCount();
+        variableCount = variableMap.size();
 
         variables = VARIABLES.get(dependencyList);
 

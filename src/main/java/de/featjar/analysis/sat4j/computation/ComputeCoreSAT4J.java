@@ -58,7 +58,7 @@ public class ComputeCoreSAT4J extends ASAT4JAnalysis.Solution<BooleanAssignment>
         Random random = new Random(RANDOM_SEED.get(dependencyList));
         BooleanAssignment variablesOfInterest = VARIABLES_OF_INTEREST.get(dependencyList);
         VariableMap variableMap = BOOLEAN_CLAUSE_LIST.get(dependencyList).getVariableMap();
-        int variableCount = variableMap.getVariableCount();
+        int variableCount = variableMap.size();
 
         checkCancel();
         progress.setTotalSteps(variableCount + 2);
@@ -66,7 +66,7 @@ public class ComputeCoreSAT4J extends ASAT4JAnalysis.Solution<BooleanAssignment>
         solver.setSelectionStrategy(ISelectionStrategy.positive());
         Result<Boolean> hasSolution = solver.hasSolution();
         if (hasSolution.isEmpty()) {
-            return hasSolution.merge(Result.empty());
+            return hasSolution.nullify();
         } else if (hasSolution.valueEquals(Boolean.FALSE)) {
             return Result.of(new BooleanAssignment());
         }
@@ -78,7 +78,7 @@ public class ComputeCoreSAT4J extends ASAT4JAnalysis.Solution<BooleanAssignment>
         solver.setSelectionStrategy(ISelectionStrategy.inverse(potentialCore));
         hasSolution = solver.hasSolution();
         if (hasSolution.isEmpty()) {
-            return hasSolution.merge(Result.empty());
+            return hasSolution.nullify();
         }
         BooleanSolution.removeConflictsInplace(potentialCore, solver.getInternalSolution());
         solver.shuffleOrder(random);

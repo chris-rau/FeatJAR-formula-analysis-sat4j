@@ -52,7 +52,7 @@ public class RandomConfigurationUpdater implements IConfigurationUpdater {
                 .map(ComputeCoreSAT4J::new)
                 .set(ComputeCoreSAT4J.ASSUMED_ASSIGNMENT, partialSolution)
                 .computeResult()
-                .map(a -> a.toSolution(model.getVariableMap().getVariableCount()));
+                .map(a -> a.toSolution(model.getVariableMap().size()));
     }
 
     @Override
@@ -97,6 +97,6 @@ public class RandomConfigurationUpdater implements IConfigurationUpdater {
         return solver.hasSolution()
                 .filter(hasSolution -> hasSolution)
                 .map(hasSolution -> new BooleanSolution(
-                        Arrays.copyOfRange(solver.getInternalSolution(), 0, orgVariableMap.getVariableCount())));
+                        Arrays.copyOfRange(solver.getInternalSolution(), 0, orgVariableMap.size())));
     }
 }

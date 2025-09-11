@@ -66,7 +66,7 @@ public class ComputeCoreDeadMIG extends ASAT4JAnalysis.Solution<BooleanAssignmen
         BooleanAssignment variablesOfInterest = VARIABLES_OF_INTEREST.get(dependencyList);
         ModalImplicationGraph mig = MIG.get(dependencyList);
 
-        progress.setTotalSteps(clauseList.getVariableMap().getVariableCount() + 2);
+        progress.setTotalSteps(clauseList.getVariableMap().size() + 2);
         checkCancel();
 
         solver.setSelectionStrategy(ISelectionStrategy.positive()); // TODO: fails for berkeley db

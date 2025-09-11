@@ -85,7 +85,7 @@ public class ComputeAtomicSetsSAT4J extends ASAT4JAnalysis.Solution<BooleanAssig
         boolean omitComplements = OMIT_COMPLEMENTS.get(dependencyList);
 
         final BooleanAssignmentList atomicSets = new BooleanAssignmentList(variableMap);
-        variableCount = variableMap.getVariableCount();
+        variableCount = variableMap.size();
         bitSetSize = 2 * variableCount;
         solutions = new ArrayList<>();
 
@@ -105,7 +105,7 @@ public class ComputeAtomicSetsSAT4J extends ASAT4JAnalysis.Solution<BooleanAssig
         solver.setSelectionStrategy(ISelectionStrategy.positive());
         Result<Boolean> hasSolution = solver.hasSolution();
         if (hasSolution.isEmpty()) {
-            return hasSolution.merge(Result.empty());
+            return hasSolution.nullify();
         }
         progress.incrementCurrentStep();
         checkCancel();

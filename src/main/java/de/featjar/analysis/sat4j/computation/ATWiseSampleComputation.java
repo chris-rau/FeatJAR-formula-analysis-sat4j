@@ -103,7 +103,7 @@ public abstract class ATWiseSampleComputation extends AComputation<BooleanAssign
         combinationSets = COMBINATION_SET.get(dependencyList);
 
         variableMap = combinationSets.variableMap();
-        variableCount = variableMap.getVariableCount();
+        variableCount = variableMap.size();
 
         excludeFilter = EXCLUDE_INTERACTIONS.get(dependencyList);
         includeFilter = INCLUDE_INTERACTIONS.get(dependencyList);

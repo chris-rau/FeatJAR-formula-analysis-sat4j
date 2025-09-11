@@ -92,7 +92,7 @@ public class CNFSlicer extends AComputation<BooleanAssignmentList> {
 
         cnfCopy = new BooleanAssignmentList(orgCNF.getVariableMap());
 
-        map = new DirtyFeature[orgCNF.getVariableMap().getVariableCount() + 1];
+        map = new DirtyFeature[orgCNF.getVariableMap().size() + 1];
         numberOfDirtyFeatures = 0;
         for (final int curFeature : dirtyVariables.get()) {
             map[curFeature] = new DirtyFeature(curFeature);

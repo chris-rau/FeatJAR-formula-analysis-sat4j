@@ -82,7 +82,7 @@ public class ComputeImplicationsSAT4J extends ASAT4JAnalysis.Solution<BooleanAss
         boolean omitSingles = OMIT_SINGLE_SETS.get(dependencyList);
 
         final BooleanAssignmentList implications = new BooleanAssignmentList(variableMap);
-        variableCount = variableMap.getVariableCount();
+        variableCount = variableMap.size();
         bitSetSize = 2 * variableCount;
         solutions = new ArrayList<>();
 
@@ -102,7 +102,7 @@ public class ComputeImplicationsSAT4J extends ASAT4JAnalysis.Solution<BooleanAss
         solver.setSelectionStrategy(ISelectionStrategy.positive());
         Result<Boolean> hasSolution = solver.hasSolution();
         if (hasSolution.isEmpty()) {
-            return hasSolution.merge(Result.empty());
+            return hasSolution.nullify();
         }
         progress.incrementCurrentStep();
         checkCancel();

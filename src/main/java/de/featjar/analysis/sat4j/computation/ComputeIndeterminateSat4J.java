@@ -58,7 +58,7 @@ public class ComputeIndeterminateSat4J extends ASAT4JAnalysis.Solution<BooleanAs
 
         BooleanAssignment variables = variablesOfInterest.isEmpty()
                 ? new BooleanAssignment(
-                        IntStream.rangeClosed(1, clauseList.getVariableMap().getVariableCount())
+                        IntStream.rangeClosed(1, clauseList.getVariableMap().size())
                                 .toArray())
                 : variablesOfInterest;
 
