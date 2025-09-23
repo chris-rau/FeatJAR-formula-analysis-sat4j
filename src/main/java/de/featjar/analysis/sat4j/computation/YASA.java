@@ -22,7 +22,6 @@ package de.featjar.analysis.sat4j.computation;
 
 import de.featjar.analysis.RuntimeContradictionException;
 import de.featjar.analysis.RuntimeTimeoutException;
-import de.featjar.analysis.sat4j.solver.IMIGVisitor;
 import de.featjar.analysis.sat4j.solver.ISelectionStrategy;
 import de.featjar.analysis.sat4j.solver.MIGVisitorBitSet;
 import de.featjar.analysis.sat4j.solver.MIGVisitorByte;
@@ -56,11 +55,9 @@ import java.util.List;
 public class YASA extends ATWiseSampleComputation {
 
     private static class PartialConfiguration {
-        private final int id;
+        private int id;
         private final boolean allowChange;
-        private final IMIGVisitor visitor;
-
-        private int randomCount;
+        private final MIGVisitorBitSet visitor;
 
         public PartialConfiguration(int id, boolean allowChange, ModalImplicationGraph mig, int... newliterals) {
             this.id = id;
@@ -71,6 +68,12 @@ public class YASA extends ATWiseSampleComputation {
             } else {
                 visitor.setLiterals(newliterals);
             }
+        }
+
+        public PartialConfiguration(PartialConfiguration other, int id) {
+            this.id = id;
+            this.allowChange = other.allowChange;
+            visitor = new MIGVisitorBitSet(other.visitor);
         }
 
         public int setLiteral(int... literals) {
@@ -84,19 +87,47 @@ public class YASA extends ATWiseSampleComputation {
         }
     }
 
+    /**
+     * The input formula in CNF.
+     */
     public static final Dependency<BooleanAssignmentList> BOOLEAN_CLAUSE_LIST =
             Dependency.newDependency(BooleanAssignmentList.class);
+    /**
+     * An assignment to assume in addition to the input formula.
+     */
     public static final Dependency<BooleanAssignment> ASSUMED_ASSIGNMENT =
             Dependency.newDependency(BooleanAssignment.class);
+    /**
+     * A list of CNF clauses to assume in addition to the input formula.
+     */
     public static final Dependency<BooleanAssignmentList> ASSUMED_CLAUSE_LIST =
             Dependency.newDependency(BooleanAssignmentList.class);
+    /**
+     * The internal SAT timeout. No timeout per default.
+     */
     public static final Dependency<Duration> SAT_TIMEOUT = Dependency.newDependency(Duration.class);
+    /**
+     * The MIG to use. Will be computed if none is provided.
+     */
     public static final Dependency<ModalImplicationGraph> MIG = Dependency.newDependency(ModalImplicationGraph.class);
 
+    /**
+     * Number of iterations for decreasing the sample size.
+     */
     public static final Dependency<Integer> ITERATIONS = Dependency.newDependency(Integer.class);
+    /**
+     * The maximum number of solution for internal caching.
+     */
     public static final Dependency<Integer> INTERNAL_SOLUTION_LIMIT = Dependency.newDependency(Integer.class);
+    /**
+     * Whether to use an incremental approach for t values.
+     */
     public static final Dependency<Boolean> INCREMENTAL_T = Dependency.newDependency(Boolean.class);
 
+    /**
+     * Constructs a new YASA computation.
+     * @param clauseList the computation of the input formula
+     */
     public YASA(IComputation<BooleanAssignmentList> clauseList) {
         super(
                 clauseList.map(VariableCombinationSpecificationComputation::new),
@@ -112,11 +143,11 @@ public class YASA extends ATWiseSampleComputation {
 
     private int iterations, randomConfigurationLimit, curSolutionId, randomSampleIdsIndex;
     private boolean incrementalT;
-    private List<PartialConfiguration> currentSample, selectionCandidates;
+    private List<PartialConfiguration> currentSample;
     private SampleBitIndex bestSampleIndex, currentSampleIndex, randomSampleIndex;
 
-    protected SAT4JSolutionSolver solver;
-    protected ModalImplicationGraph mig;
+    private SAT4JSolutionSolver solver;
+    private ModalImplicationGraph mig;
 
     @Override
     public Result<BooleanAssignmentList> computeSample(List<Object> dependencyList, Progress progress) {
@@ -144,8 +175,6 @@ public class YASA extends ATWiseSampleComputation {
         solver = new SAT4JSolutionSolver(clauseList);
         SAT4JSolver.initializeSolver(solver, clauseList, assumedAssignment, assumedClauseList, timeout);
         solver.setSelectionStrategy(ISelectionStrategy.random(random));
-
-        selectionCandidates = new ArrayList<>();
 
         progress.setTotalSteps((iterations + 1) * combinationSets.loopCount());
 
@@ -180,7 +209,7 @@ public class YASA extends ATWiseSampleComputation {
 
     private void buildCombinations(Progress monitor) {
         curSolutionId = 0;
-        currentSample = new ArrayList<>();
+        currentSample = null;
         currentSampleIndex = new SampleBitIndex(variableMap);
         for (BooleanAssignment config : initialFixedSample) {
             currentSampleIndex.addConfiguration(config);
@@ -200,7 +229,17 @@ public class YASA extends ATWiseSampleComputation {
                 newRandomConfiguration(combinationLiterals);
             }
         });
-        setBestSolutionList();
+        bestSampleIndex = currentSampleIndex;
+    }
+
+    private boolean isCombinationInvalidMIG(int[] literals) {
+        try {
+            MIGVisitorByte visitor = new MIGVisitorByte(mig);
+            visitor.propagate(literals);
+        } catch (RuntimeContradictionException e) {
+            return true;
+        }
+        return false;
     }
 
     private void newRandomConfiguration(final int[] fixedLiterals) {
@@ -225,10 +264,22 @@ public class YASA extends ATWiseSampleComputation {
     }
 
     private void rebuildCombinations(Progress monitor) {
+        int maxT = combinationSets.maxT();
+        int minT = incrementalT ? 1 : maxT;
+        List<PartialConfiguration> bestSample = null;
+        List<PartialConfiguration> oldSample = null;
+
         for (int j = 0; j < iterations; j++) {
+            if (bestSample != null) {
+                Collections.sort(bestSample, Comparator.comparingInt(c -> c.countLiterals()));
+                oldSample = bestSample.subList(0, ((int) (0.7 * bestSample.size())));
+                bestSample = null;
+            }
+
             curSolutionId = 0;
             currentSample = new ArrayList<>();
             currentSampleIndex = new SampleBitIndex(variableMap);
+
             for (BooleanAssignment config : initialFixedSample) {
                 newConfiguration(config.get(), false);
             }
@@ -236,8 +287,21 @@ public class YASA extends ATWiseSampleComputation {
                 newConfiguration(config.get(), true);
             }
 
-            int maxT = combinationSets.maxT();
-            int minT = incrementalT ? 1 : maxT;
+            if (oldSample != null) {
+                for (PartialConfiguration config : oldSample) {
+                    if (currentSample.size() >= maxSampleSize) {
+                        break;
+                    }
+                    config.id = curSolutionId++;
+                    currentSample.add(config);
+                    currentSampleIndex.addEmptyConfiguration();
+                    updateIndex(config, 0);
+                    for (int l : mig.getCore()) {
+                        currentSampleIndex.set(config.id, l);
+                    }
+                }
+            }
+
             combinationSets.shuffleElements(random);
             for (int t = minT; t <= maxT; t++) {
                 combinationSets.reduceTTo(t).forEach(combinationLiterals -> {
@@ -247,24 +311,16 @@ public class YASA extends ATWiseSampleComputation {
                     if (!currentSampleIndex.test(combinationLiterals)
                             && bestSampleIndex.test(combinationLiterals)
                             && includeFilter.test(combinationLiterals)
-                            && !excludeFilter.test(combinationLiterals)) {
-                        getSelectionCandidates(combinationLiterals);
-                        if (selectionCandidates.isEmpty()
-                                || (!tryCoverWithRandomSolutions(combinationLiterals)
-                                        && !tryCoverWithSat(combinationLiterals))) {
-                            newConfiguration(combinationLiterals, true);
-                        }
-                        selectionCandidates.clear();
+                            && !excludeFilter.test(combinationLiterals)
+                            && !tryCoverInExistingSolution(combinationLiterals)) {
+                        newConfiguration(combinationLiterals, true);
                     }
                 });
             }
-            setBestSolutionList();
-        }
-    }
-
-    private void setBestSolutionList() {
-        if (bestSampleIndex == null || bestSampleIndex.size() > currentSampleIndex.size()) {
-            bestSampleIndex = currentSampleIndex;
+            if (bestSampleIndex.size() > currentSampleIndex.size()) {
+                bestSampleIndex = currentSampleIndex;
+                bestSample = currentSample;
+            }
         }
     }
 
@@ -276,7 +332,9 @@ public class YASA extends ATWiseSampleComputation {
         }
     }
 
-    private boolean getSelectionCandidates(int[] literals) {
+    private boolean tryCoverInExistingSolution(int[] literals) {
+        List<PartialConfiguration> selectionCandidates = new ArrayList<>();
+
         BitSet negatedBitSet = currentSampleIndex.getNegatedBitSet(literals);
         int nextBit = negatedBitSet.nextClearBit(0);
         while (nextBit < currentSampleIndex.size()) {
@@ -286,21 +344,21 @@ public class YASA extends ATWiseSampleComputation {
             }
             nextBit = negatedBitSet.nextClearBit(nextBit + 1);
         }
-        return false;
-    }
 
-    private boolean tryCoverWithRandomSolutions(int[] literals) {
-        // TODO use this set for AND
+        if (selectionCandidates.isEmpty()) {
+            return false;
+        }
+
+        Collections.sort(
+                selectionCandidates,
+                Comparator.<PartialConfiguration>comparingInt(c -> c.visitor.countUndefined(literals))
+                        .thenComparingInt(c -> -c.countLiterals()));
+
         BitSet literalBitSet = randomSampleIndex.getBitSet(literals);
         if (!literalBitSet.isEmpty()) {
-            Collections.sort(
-                    selectionCandidates,
-                    Comparator.<PartialConfiguration>comparingInt(c -> c.visitor.countUndefined(literals))
-                            .thenComparingInt(c -> c.countLiterals()));
             for (PartialConfiguration configuration : selectionCandidates) {
                 BitSet configurationBitSet = randomSampleIndex.getBitSet(
                         configuration.visitor.getAddedLiterals(), configuration.visitor.getAddedLiteralCount());
-                configuration.randomCount = configurationBitSet.cardinality();
                 configurationBitSet.and(literalBitSet);
                 if (!configurationBitSet.isEmpty()) {
                     updateIndex(configuration, configuration.setLiteral(literals));
@@ -308,21 +366,7 @@ public class YASA extends ATWiseSampleComputation {
                 }
             }
         }
-        return false;
-    }
 
-    private boolean isCombinationInvalidMIG(int[] literals) {
-        try {
-            MIGVisitorByte visitor = new MIGVisitorByte(mig);
-            visitor.propagate(literals);
-        } catch (RuntimeContradictionException e) {
-            return true;
-        }
-        return false;
-    }
-
-    private boolean tryCoverWithSat(int[] literals) {
-        Collections.sort(selectionCandidates, Comparator.comparingInt(c -> c.randomCount));
         for (PartialConfiguration configuration : selectionCandidates) {
             if (trySelectSat(configuration, literals)) {
                 return true;
