@@ -39,6 +39,12 @@ public class MIGVisitorBitSet implements IMIGVisitor {
         addedLiterals = new ExpandableIntegerList((mig.size - mig.core.length) / 8 + 1);
     }
 
+    public MIGVisitorBitSet(MIGVisitorBitSet other) {
+        this.mig = other.mig;
+        this.model = (BitSet) other.model.clone();
+        this.addedLiterals = new ExpandableIntegerList(other.addedLiterals);
+    }
+
     private static int encode(int l) {
         return ((l ^ (l >> 31)) << 1) - (l >> 31);
     }
