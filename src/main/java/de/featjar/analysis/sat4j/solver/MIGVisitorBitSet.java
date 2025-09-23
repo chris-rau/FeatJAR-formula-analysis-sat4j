@@ -120,7 +120,7 @@ public class MIGVisitorBitSet implements IMIGVisitor {
 
     @Override
     public boolean isUndefined(int literal) {
-        return model.get(encode(literal)) && model.get(encode(-literal));
+        return !model.get(encode(literal)) && !model.get(encode(-literal));
     }
 
     @Override
