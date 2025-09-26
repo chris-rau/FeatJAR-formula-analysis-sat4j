@@ -297,7 +297,7 @@ public class YASA extends ATWiseSampleComputation {
                     currentSampleIndex.addEmptyConfiguration();
                     updateIndex(config, 0);
                     for (int l : mig.getCore()) {
-                        currentSampleIndex.set(config.id, l);
+                        currentSampleIndex.update(config.id, l);
                     }
                 }
             }
@@ -328,7 +328,7 @@ public class YASA extends ATWiseSampleComputation {
         int addedLiteralCount = solution.visitor.getAddedLiteralCount();
         int[] addedLiterals = solution.visitor.getAddedLiterals();
         for (int i = firstLiteralToConsider; i < addedLiteralCount; i++) {
-            currentSampleIndex.set(solution.id, addedLiterals[i]);
+            currentSampleIndex.update(solution.id, addedLiterals[i]);
         }
     }
 
@@ -383,7 +383,7 @@ public class YASA extends ATWiseSampleComputation {
             currentSampleIndex.addEmptyConfiguration();
             updateIndex(newConfiguration, 0);
             for (int l : mig.getCore()) {
-                currentSampleIndex.set(newConfiguration.id, l);
+                currentSampleIndex.update(newConfiguration.id, l);
             }
         }
     }
@@ -410,7 +410,7 @@ public class YASA extends ATWiseSampleComputation {
                     updateIndex(configuration, oldModelCount);
                     randomSampleIdsIndex = (randomSampleIdsIndex + 1) % randomConfigurationLimit;
                     final int[] solution = solver.getInternalSolution();
-                    randomSampleIndex.set(randomSampleIdsIndex, solution);
+                    randomSampleIndex.update(randomSampleIdsIndex, solution);
                     solver.shuffleOrder(random);
                     return true;
                 } else {
