@@ -66,6 +66,10 @@ public class ModalImplicationGraph {
         return core;
     }
 
+    public int[][] getStrongEdges() {
+        return strong;
+    }
+
     public int size() {
         return size;
     }
